@@ -16,8 +16,8 @@ Komendy:
 - `/admin-mecz-wynik wynik:<gospodarze>:<goście>`
 
 Komendy administracyjne wymagają uprawnienia `Manage Guild` albo `Administrator`.
-Kickoff należy podawać jako ISO 8601 ze strefą czasową, np.
-`2026-09-12T18:30:00+00:00`.
+Kickoff należy podawać jako czas Polski w formacie `RRRR-MM-DD GG:MM`, np.
+`2026-09-12 18:30`. Bot konwertuje tę wartość do UTC w bazie.
 
 ## Uruchomienie
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import logging
+from zoneinfo import ZoneInfo
 
 import discord
 from discord import app_commands
@@ -11,16 +12,15 @@ from .application import TyperService
 from .domain import DomainError, Score
 
 logger = logging.getLogger(__name__)
+LOCAL_TIMEZONE = ZoneInfo("Europe/Warsaw")
 
 
 def parse_kickoff(value: str) -> datetime:
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.strptime(value.strip(), "%Y-%m-%d %H:%M")
     except ValueError as exc:
-        raise DomainError("Kickoff musi być w ISO 8601, np. 2026-09-12T18:30:00+00:00.") from exc
-    if parsed.tzinfo is None:
-        raise DomainError("Kickoff musi zawierać strefę czasową, np. +00:00.")
-    return parsed.astimezone(timezone.utc)
+        raise DomainError("Kickoff musi mieć format RRRR-MM-DD GG:MM, np. 2026-09-12 18:30.") from exc
+    return parsed.replace(tzinfo=LOCAL_TIMEZONE).astimezone(timezone.utc)
 
 
 class TyperCog(commands.Cog):
@@ -32,7 +32,7 @@ class TyperCog(commands.Cog):
         gospodarze="Pełna nazwa gospodarzy",
         goscie="Pełna nazwa gości",
         rozgrywki="Nazwa rozgrywek",
-        kickoff="Kickoff w ISO 8601, np. 2026-09-12T18:30:00+00:00",
+        kickoff="Kickoff w formacie RRRR-MM-DD GG:MM, np. 2026-09-12 18:30",
     )
     async def add_match(
         self,
@@ -68,7 +68,7 @@ class TyperCog(commands.Cog):
 
     @app_commands.command(name="admin-mecz-edytuj")
     @app_commands.describe(
-        kickoff="Nowy kickoff w ISO 8601",
+        kickoff="Nowy kickoff w formacie RRRR-MM-DD GG:MM",
     )
     async def edit_match(
         self,
