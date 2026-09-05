@@ -197,6 +197,11 @@ class UserTyperCog(commands.Cog):
             )
             if match is None:
                 message = "Jeszcze nie typowałeś."
+            elif prediction is None and match.kickoff_at <= datetime.now(timezone.utc):
+                message = (
+                    f"Nie masz typu na aktualnie trwający mecz "
+                    f"{match.home_team} - {match.away_team}."
+                )
             elif prediction is None:
                 message = f"Nie masz jeszcze typu dla meczu #{match.id}."
             else:

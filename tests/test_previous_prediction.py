@@ -10,7 +10,7 @@ from united_bot.db import (
     create_schema,
     create_session_factory,
 )
-from united_bot.domain import Score
+from united_bot.domain import DomainError, Score
 
 
 @pytest.fixture
@@ -75,4 +75,50 @@ async def test_my_prediction_returns_no_prediction_when_user_has_never_typed(
     )
 
     assert match is None
+    assert prediction is None
+
+
+@pytest.mark.asyncio
+async def test_prediction_reports_expired_window_after_kickoff(
+    service: TyperService,
+) -> None:
+    kickoff = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    match = await service.add_match(
+        1,
+        "Everton",
+        "Manchester United",
+        "Premier League",
+        kickoff,
+    )
+
+    with pytest.raises(DomainError, match="Czas typowania dla meczu Everton - Manchester United minął."):
+        await service.save_prediction(
+            1,
+            42,
+            Score(2, 1),
+            kickoff + timedelta(hours=1),
+        )
+
+
+@pytest.mark.asyncio
+async def test_my_prediction_returns_ongoing_match_without_previous_type(
+    service: TyperService,
+) -> None:
+    kickoff = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    match = await service.add_match(
+        1,
+        "Everton",
+        "Manchester United",
+        "Premier League",
+        kickoff,
+    )
+
+    current_match, prediction = await service.get_prediction(
+        1,
+        42,
+        kickoff + timedelta(hours=1),
+    )
+
+    assert current_match is not None
+    assert current_match.id == match.id
     assert prediction is None

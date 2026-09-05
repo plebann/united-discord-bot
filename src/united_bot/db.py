@@ -127,6 +127,20 @@ class MatchRepository:
                     return match
             return None
 
+    async def get_in_progress(self, guild_id: int, now: datetime) -> Match | None:
+        async with self._session_factory() as session:
+            row = await session.scalar(
+                select(MatchRow)
+                .where(
+                    MatchRow.guild_id == guild_id,
+                    MatchRow.status == MatchStatus.SCHEDULED.value,
+                    MatchRow.kickoff_at <= now,
+                )
+                .order_by(MatchRow.kickoff_at.desc())
+                .limit(1)
+            )
+            return self._to_domain(row) if row else None
+
     async def get_next_scheduled(self, guild_id: int) -> Match | None:
         async with self._session_factory() as session:
             row = await session.scalar(

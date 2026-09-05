@@ -56,6 +56,12 @@ class TyperService:
         current_time = now or utc_now()
         match = await self.matches.get_current(guild_id, current_time)
         if match is None:
+            in_progress = await self.matches.get_in_progress(guild_id, current_time)
+            if in_progress is not None:
+                raise DomainError(
+                    f"Czas typowania dla meczu {in_progress.home_team} - "
+                    f"{in_progress.away_team} minął."
+                )
             raise DomainError("Nie ma teraz aktywnego meczu do typowania.")
         previous_prediction = await self.predictions.get(match.id, user_id)
         prediction = await self.predictions.upsert(
@@ -69,7 +75,11 @@ class TyperService:
         user_id: int,
         now: datetime | None = None,
     ) -> tuple[Match | None, Prediction | None]:
-        match = await self.matches.get_current(guild_id, now or utc_now())
+        current_time = now or utc_now()
+        in_progress = await self.matches.get_in_progress(guild_id, current_time)
+        if in_progress is not None:
+            return in_progress, await self.predictions.get(in_progress.id, user_id)
+        match = await self.matches.get_current(guild_id, current_time)
         if match is not None:
             return match, await self.predictions.get(match.id, user_id)
         previous = await self.predictions.get_latest_for_user(guild_id, user_id)
