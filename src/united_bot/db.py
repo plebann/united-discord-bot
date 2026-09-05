@@ -233,6 +233,19 @@ class PredictionRepository:
             match_row, prediction_row = row
             return match_row_to_domain(match_row), self._to_domain(prediction_row)
 
+    async def has_any_for_user(self, guild_id: int, user_id: int) -> bool:
+        async with self._session_factory() as session:
+            row = await session.scalar(
+                select(PredictionRow.match_id)
+                .join(MatchRow, MatchRow.id == PredictionRow.match_id)
+                .where(
+                    MatchRow.guild_id == guild_id,
+                    PredictionRow.user_id == user_id,
+                )
+                .limit(1)
+            )
+            return row is not None
+
     async def settle_match(self, match_id: int, actual: Score) -> list[Prediction]:
         async with self._session_factory() as session:
             rows = (

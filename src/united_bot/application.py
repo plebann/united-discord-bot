@@ -81,7 +81,10 @@ class TyperService:
             return in_progress, await self.predictions.get(in_progress.id, user_id)
         match = await self.matches.get_current(guild_id, current_time)
         if match is not None:
-            return match, await self.predictions.get(match.id, user_id)
+            prediction = await self.predictions.get(match.id, user_id)
+            if prediction is not None or await self.predictions.has_any_for_user(guild_id, user_id):
+                return match, prediction
+            return None, None
         previous = await self.predictions.get_latest_for_user(guild_id, user_id)
         return previous if previous is not None else (None, None)
 

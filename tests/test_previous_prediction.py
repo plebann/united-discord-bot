@@ -79,6 +79,29 @@ async def test_my_prediction_returns_no_prediction_when_user_has_never_typed(
 
 
 @pytest.mark.asyncio
+async def test_my_prediction_returns_no_history_for_never_typed_user_with_open_match(
+    service: TyperService,
+) -> None:
+    kickoff = datetime(2030, 1, 3, tzinfo=timezone.utc)
+    await service.add_match(
+        1,
+        "Everton",
+        "Manchester United",
+        "Premier League",
+        kickoff,
+    )
+
+    match, prediction = await service.get_prediction(
+        1,
+        42,
+        kickoff - timedelta(days=1),
+    )
+
+    assert match is None
+    assert prediction is None
+
+
+@pytest.mark.asyncio
 async def test_prediction_reports_expired_window_after_kickoff(
     service: TyperService,
 ) -> None:
