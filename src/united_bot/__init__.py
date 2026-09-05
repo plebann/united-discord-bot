@@ -1,0 +1,2 @@
+"""Manchester United Discord typer."""
+
