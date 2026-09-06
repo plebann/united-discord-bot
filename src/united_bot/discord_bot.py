@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import logging
+import os
 from zoneinfo import ZoneInfo
 
 import discord
@@ -13,6 +14,29 @@ from .domain import DomainError, Score
 
 logger = logging.getLogger(__name__)
 LOCAL_TIMEZONE = ZoneInfo("Europe/Warsaw")
+CHANNEL_CONFIGURATION_ERROR = (
+    "Bot nie ma skonfigurowanego poprawnego kanału dla komend. "
+    "Skontaktuj się z administratorem serwera."
+)
+
+
+class ChannelCheckFailure(app_commands.CheckFailure):
+    """Raised when a command is used outside the configured channel."""
+
+
+def configured_channel_check(interaction: discord.Interaction) -> bool:
+    configured_channel = os.getenv("CHANNEL_ID", "").strip()
+    if not configured_channel.isdigit() or int(configured_channel) <= 0:
+        raise ChannelCheckFailure(CHANNEL_CONFIGURATION_ERROR)
+    if interaction.guild is None:
+        raise ChannelCheckFailure(
+            "Ta komenda działa tylko na skonfigurowanym kanale serwera."
+        )
+    if interaction.channel_id != int(configured_channel):
+        raise ChannelCheckFailure(
+            f"Tej komendy można używać tylko na kanale <#{configured_channel}>."
+        )
+    return True
 
 
 def parse_kickoff(value: str) -> datetime:
@@ -28,6 +52,7 @@ class TyperCog(commands.Cog):
         self.service = service
 
     @app_commands.command(name="admin-mecz-dodaj")
+    @app_commands.check(configured_channel_check)
     @app_commands.describe(
         gospodarze="Pełna nazwa gospodarzy",
         goscie="Pełna nazwa gości",
@@ -67,6 +92,7 @@ class TyperCog(commands.Cog):
             await interaction.response.send_message(str(exc), ephemeral=True)
 
     @app_commands.command(name="admin-mecz-edytuj")
+    @app_commands.check(configured_channel_check)
     @app_commands.describe(
         kickoff="Nowy kickoff w formacie RRRR-MM-DD GG:MM",
     )
@@ -90,6 +116,7 @@ class TyperCog(commands.Cog):
             await interaction.response.send_message(str(exc), ephemeral=True)
 
     @app_commands.command(name="admin-mecz-wynik")
+    @app_commands.check(configured_channel_check)
     @app_commands.describe(wynik="Wynik regulaminowy, np. 3:0")
     async def finish_match(
         self,
@@ -157,6 +184,7 @@ class UserTyperCog(commands.Cog):
         self.service = service
 
     @app_commands.command(name="typ")
+    @app_commands.check(configured_channel_check)
     @app_commands.describe(wynik="Wynik bieżącego meczu, np. 3:0")
     async def predict(
         self,
@@ -189,6 +217,7 @@ class UserTyperCog(commands.Cog):
             await interaction.response.send_message(str(exc), ephemeral=True)
 
     @app_commands.command(name="moj-typ")
+    @app_commands.check(configured_channel_check)
     async def my_prediction(self, interaction: discord.Interaction) -> None:
         try:
             match, prediction = await self.service.get_prediction(
@@ -242,6 +271,19 @@ async def create_bot(service: TyperService) -> commands.Bot:
     async def on_ready() -> None:
         if bot.user is not None:
             logger.info("Bot zalogowany jako %s (id=%s)", bot.user, bot.user.id)
+
+    @bot.tree.error
+    async def on_app_command_error(
+        interaction: discord.Interaction,
+        error: app_commands.AppCommandError,
+    ) -> None:
+        if isinstance(error, ChannelCheckFailure):
+            if interaction.response.is_done():
+                await interaction.followup.send(str(error), ephemeral=True)
+            else:
+                await interaction.response.send_message(str(error), ephemeral=True)
+            return
+        logger.error("Błąd komendy aplikacji: %s", error)
 
     return bot
 

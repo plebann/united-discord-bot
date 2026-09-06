@@ -18,6 +18,8 @@ Komendy:
 Komendy administracyjne wymagają uprawnienia `Manage Guild` albo `Administrator`.
 Kickoff należy podawać jako czas Polski w formacie `RRRR-MM-DD GG:MM`, np.
 `2026-09-12 18:30`. Bot konwertuje tę wartość do UTC w bazie.
+Wszystkie slash commands działają wyłącznie na kanale wskazanym przez
+`CHANNEL_ID` w pliku `.env`.
 
 ## Uruchomienie
 
