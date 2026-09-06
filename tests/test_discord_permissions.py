@@ -27,5 +27,5 @@ async def test_manage_server_permission_from_interaction_is_accepted() -> None:
         response=response,
     )
 
-    assert await TyperCog(object())._require_admin(interaction) is True
+    assert await TyperCog(object(), object())._require_admin(interaction) is True
     assert response.messages == []
