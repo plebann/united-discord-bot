@@ -40,6 +40,14 @@ class PredictionRow(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class AnnouncementRow(Base):
+    __tablename__ = "announcements"
+
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), primary_key=True)
+    announcement_type: Mapped[str] = mapped_column(String(40), primary_key=True)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 def match_row_to_domain(row: MatchRow) -> Match:
     kickoff_at = row.kickoff_at
     if kickoff_at.tzinfo is None:
@@ -152,6 +160,21 @@ class MatchRepository:
                 .order_by(MatchRow.kickoff_at)
             )
             return self._to_domain(row) if row else None
+
+    async def list_prediction_open_due(self, now: datetime) -> list[Match]:
+        async with self._session_factory() as session:
+            rows = (
+                await session.scalars(
+                    select(MatchRow)
+                    .where(
+                        MatchRow.status == MatchStatus.SCHEDULED.value,
+                        MatchRow.kickoff_at > now,
+                        MatchRow.kickoff_at <= now + timedelta(days=3),
+                    )
+                    .order_by(MatchRow.kickoff_at)
+                )
+            ).all()
+            return [self._to_domain(row) for row in rows]
 
     async def update(self, match: Match) -> Match:
         if match.id is None:
@@ -268,6 +291,35 @@ class PredictionRepository:
             submitted_at=row.submitted_at or row.updated_at,
             updated_at=row.updated_at,
         )
+
+
+class AnnouncementRepository:
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+        self._session_factory = session_factory
+
+    async def was_sent(self, match_id: int, announcement_type: str) -> bool:
+        async with self._session_factory() as session:
+            row = await session.get(
+                AnnouncementRow,
+                {"match_id": match_id, "announcement_type": announcement_type},
+            )
+            return row is not None
+
+    async def mark_sent(
+        self,
+        match_id: int,
+        announcement_type: str,
+        sent_at: datetime,
+    ) -> None:
+        async with self._session_factory() as session:
+            session.add(
+                AnnouncementRow(
+                    match_id=match_id,
+                    announcement_type=announcement_type,
+                    sent_at=sent_at,
+                )
+            )
+            await session.commit()
 
 
 def calculate_points_from_rows(actual: Score, prediction: PredictionRow) -> int:

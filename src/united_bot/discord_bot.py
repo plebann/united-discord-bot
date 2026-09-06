@@ -7,8 +7,9 @@ from zoneinfo import ZoneInfo
 
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
+from .announcements import AnnouncementService
 from .application import TyperService
 from .domain import DomainError, Score
 
@@ -22,6 +23,24 @@ CHANNEL_CONFIGURATION_ERROR = (
 
 class ChannelCheckFailure(app_commands.CheckFailure):
     """Raised when a command is used outside the configured channel."""
+
+
+class DiscordAnnouncementPublisher:
+    def __init__(self) -> None:
+        self.bot: commands.Bot | None = None
+
+    async def publish(self, content: str) -> None:
+        configured_channel = os.getenv("CHANNEL_ID", "").strip()
+        if not configured_channel.isdigit() or int(configured_channel) <= 0:
+            raise RuntimeError("Nie można opublikować ogłoszenia: nieprawidłowy CHANNEL_ID.")
+        if self.bot is None:
+            raise RuntimeError("Nie można opublikować ogłoszenia przed uruchomieniem bota.")
+        channel = self.bot.get_channel(int(configured_channel))
+        if channel is None:
+            channel = await self.bot.fetch_channel(int(configured_channel))
+        if not hasattr(channel, "send"):
+            raise RuntimeError("Skonfigurowany kanał nie obsługuje wysyłania wiadomości.")
+        await channel.send(content)
 
 
 def configured_channel_check(interaction: discord.Interaction) -> bool:
@@ -48,8 +67,9 @@ def parse_kickoff(value: str) -> datetime:
 
 
 class TyperCog(commands.Cog):
-    def __init__(self, service: TyperService) -> None:
+    def __init__(self, service: TyperService, announcements: AnnouncementService) -> None:
         self.service = service
+        self.announcements = announcements
 
     @app_commands.command(name="admin-mecz-dodaj")
     @app_commands.check(configured_channel_check)
@@ -77,10 +97,8 @@ class TyperCog(commands.Cog):
                 rozgrywki,
                 parse_kickoff(kickoff),
             )
-            await interaction.response.send_message(
-                f"Dodano mecz #{match.id}: {match.home_team} - {match.away_team}. "
-                f"Typowanie otworzy się <t:{int(match.prediction_opens_at.timestamp())}:f>."
-            )
+            await interaction.response.defer()
+            await self.announcements.publish_match_configured(match)
             logger.info(
                 "Dodano mecz #%s na guildzie %s: %s - %s",
                 match.id,
@@ -88,8 +106,8 @@ class TyperCog(commands.Cog):
                 match.home_team,
                 match.away_team,
             )
-        except (DomainError, LookupError) as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True)
+        except (DomainError, LookupError, RuntimeError, discord.DiscordException) as exc:
+            await _send_command_error(interaction, exc)
 
     @app_commands.command(name="admin-mecz-edytuj")
     @app_commands.check(configured_channel_check)
@@ -104,16 +122,15 @@ class TyperCog(commands.Cog):
         if not await self._require_admin(interaction):
             return
         try:
-            match = await self.service.edit_kickoff(
+            previous, match = await self.service.edit_kickoff(
                 interaction.guild_id or 0,
                 parse_kickoff(kickoff),
             )
-            await interaction.response.send_message(
-                f"Zmieniono kickoff meczu #{match.id} na <t:{int(match.kickoff_at.timestamp())}:f>."
-            )
+            await interaction.response.defer()
+            await self.announcements.publish_match_edited(previous, match)
             logger.info("Zmieniono kickoff meczu #%s na guildzie %s", match.id, match.guild_id)
-        except (DomainError, LookupError) as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True)
+        except (DomainError, LookupError, RuntimeError, discord.DiscordException) as exc:
+            await _send_command_error(interaction, exc)
 
     @app_commands.command(name="admin-mecz-wynik")
     @app_commands.check(configured_channel_check)
@@ -130,28 +147,8 @@ class TyperCog(commands.Cog):
                 interaction.guild_id or 0,
                 Score.parse(wynik),
             )
-            lines = [
-                f"Wynik meczu {match.home_team} - {match.away_team}: "
-                f"{match.final_score.home}:{match.final_score.away}",
-                f"Rozliczono typów: {len(predictions)}",
-            ]
-            top_predictions = sorted(
-                predictions,
-                key=lambda prediction: (
-                    -(prediction.points if prediction.points is not None else 0),
-                    prediction.submitted_at,
-                ),
-            )[:10]
-            lines[1] = f"Pokazano top {len(top_predictions)} z {len(predictions)} typów"
-            lines.extend(
-                f"<@{prediction.user_id}>: "
-                f"{prediction.score.home}:{prediction.score.away} -> {prediction.points} pkt"
-                for prediction in top_predictions
-            )
-            messages = _split_messages("\n".join(lines))
-            await interaction.response.send_message(messages[0])
-            for message in messages[1:]:
-                await interaction.followup.send(message)
+            await interaction.response.defer()
+            await self.announcements.publish_result(match, predictions)
             logger.info(
                 "Zapisano wynik meczu #%s na guildzie %s: %s:%s",
                 match.id,
@@ -159,8 +156,8 @@ class TyperCog(commands.Cog):
                 match.final_score.home,
                 match.final_score.away,
             )
-        except (DomainError, LookupError) as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True)
+        except (DomainError, LookupError, RuntimeError, discord.DiscordException) as exc:
+            await _send_command_error(interaction, exc)
 
     async def _require_admin(self, interaction: discord.Interaction) -> bool:
         if interaction.guild is None:
@@ -197,15 +194,31 @@ class UserTyperCog(commands.Cog):
                 interaction.user.id,
                 Score.parse(wynik),
             )
-            previous = ""
-            if previous_prediction is not None:
-                previous = (
-                    f" (poprzedni typ {previous_prediction.score.home}:"
-                    f"{previous_prediction.score.away})"
+            if (
+                previous_prediction is not None
+                and previous_prediction.score == prediction.score
+            ):
+                await interaction.response.send_message(
+                    "Typ nie został zmieniony.",
+                    ephemeral=True,
+                )
+                return
+            if previous_prediction is None:
+                announcement = (
+                    f"<@{interaction.user.id}> wytypował "
+                    f"{prediction.score.home}:{prediction.score.away} na mecz "
+                    f"{match.home_team} - {match.away_team}"
+                )
+            else:
+                announcement = (
+                    f"<@{interaction.user.id}> zmienił typ na mecz "
+                    f"{match.home_team} - {match.away_team} na "
+                    f"{prediction.score.home}:{prediction.score.away}\n"
+                    f"Poprzednio: {previous_prediction.score.home}:"
+                    f"{previous_prediction.score.away}"
                 )
             await interaction.response.send_message(
-                f"Zapisano typ {match.home_team} - {match.away_team} "
-                f"{prediction.score.home}:{prediction.score.away}{previous}"
+                announcement
             )
             logger.info(
                 "Zapisano typ użytkownika %s dla meczu #%s na guildzie %s",
@@ -256,10 +269,14 @@ class UserTyperCog(commands.Cog):
             await interaction.response.send_message(str(exc), ephemeral=True)
 
 
-async def create_bot(service: TyperService) -> commands.Bot:
+async def create_bot(
+    service: TyperService,
+    announcements: AnnouncementService,
+    publisher: DiscordAnnouncementPublisher,
+) -> commands.Bot:
     intents = discord.Intents.none()
     bot = commands.Bot(command_prefix="!", intents=intents)
-    await bot.add_cog(TyperCog(service))
+    await bot.add_cog(TyperCog(service, announcements))
     await bot.add_cog(UserTyperCog(service))
 
     async def sync_commands() -> None:
@@ -267,10 +284,23 @@ async def create_bot(service: TyperService) -> commands.Bot:
 
     bot.setup_hook = sync_commands
 
+    @tasks.loop(minutes=5)
+    async def poll_announcements() -> None:
+        try:
+            await announcements.poll()
+        except (discord.DiscordException, RuntimeError):
+            logger.exception("Błąd schedulera ogłoszeń")
+
+    @poll_announcements.before_loop
+    async def wait_for_bot() -> None:
+        await bot.wait_until_ready()
+
     @bot.event
     async def on_ready() -> None:
         if bot.user is not None:
             logger.info("Bot zalogowany jako %s (id=%s)", bot.user, bot.user.id)
+        if not poll_announcements.is_running():
+            poll_announcements.start()
 
     @bot.tree.error
     async def on_app_command_error(
@@ -285,7 +315,18 @@ async def create_bot(service: TyperService) -> commands.Bot:
             return
         logger.error("Błąd komendy aplikacji: %s", error)
 
+    publisher.bot = bot
     return bot
+
+
+async def _send_command_error(
+    interaction: discord.Interaction,
+    error: Exception,
+) -> None:
+    if interaction.response.is_done():
+        await interaction.followup.send(str(error), ephemeral=True)
+    else:
+        await interaction.response.send_message(str(error), ephemeral=True)
 
 
 def _split_messages(content: str, limit: int = 1900) -> list[str]:

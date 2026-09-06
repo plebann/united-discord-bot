@@ -20,6 +20,9 @@ Kickoff należy podawać jako czas Polski w formacie `RRRR-MM-DD GG:MM`, np.
 `2026-09-12 18:30`. Bot konwertuje tę wartość do UTC w bazie.
 Wszystkie slash commands działają wyłącznie na kanale wskazanym przez
 `CHANNEL_ID` w pliku `.env`.
+Bot publikuje tam również ogłoszenia o konfiguracji meczu, rozpoczęciu
+typowania, zmianie kickoffu i zakończeniu rozliczenia. Ogłoszenia o otwarciu
+typowania są sprawdzane co 5 minut.
 
 ## Uruchomienie
 
@@ -31,7 +34,7 @@ Copy-Item .env.example .env
 # uzupełnij DISCORD_TOKEN
 New-Item -ItemType Directory -Force data
 py -m alembic upgrade head
-python -m united_bot.main
+py -m united_bot.main
 ```
 
 Bot używa SQLite w trybie WAL. Automatyczna synchronizacja meczów, oceny

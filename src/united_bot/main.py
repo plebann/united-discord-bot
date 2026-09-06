@@ -7,9 +7,16 @@ import logging
 
 from dotenv import load_dotenv
 
+from .announcements import AnnouncementService
 from .application import TyperService
-from .db import MatchRepository, PredictionRepository, create_schema, create_session_factory
-from .discord_bot import create_bot
+from .db import (
+    AnnouncementRepository,
+    MatchRepository,
+    PredictionRepository,
+    create_schema,
+    create_session_factory,
+)
+from .discord_bot import DiscordAnnouncementPublisher, create_bot
 from .logging_setup import configure_logging
 
 logger = logging.getLogger(__name__)
@@ -28,7 +35,13 @@ async def run() -> None:
         MatchRepository(session_factory),
         PredictionRepository(session_factory),
     )
-    bot = await create_bot(service)
+    publisher = DiscordAnnouncementPublisher()
+    announcements = AnnouncementService(
+        service.matches,
+        AnnouncementRepository(session_factory),
+        publisher,
+    )
+    bot = await create_bot(service, announcements, publisher)
     await bot.start(token)
 
 

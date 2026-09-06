@@ -40,11 +40,11 @@ class TyperService:
         self,
         guild_id: int,
         kickoff_at: datetime,
-    ) -> Match:
+    ) -> tuple[Match, Match]:
         match = await self.matches.get_next_scheduled(guild_id)
         if match is None:
             raise LookupError("Nie znaleziono nierozliczonego meczu.")
-        return await self.matches.update(match.with_kickoff(kickoff_at))
+        return match, await self.matches.update(match.with_kickoff(kickoff_at))
 
     async def save_prediction(
         self,
