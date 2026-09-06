@@ -44,6 +44,8 @@ class TyperService:
         match = await self.matches.get_next_scheduled(guild_id)
         if match is None:
             raise LookupError("Nie znaleziono nierozliczonego meczu.")
+        if match.kickoff_at == kickoff_at:
+            raise DomainError("Termin meczu nie został zmieniony.")
         return match, await self.matches.update(match.with_kickoff(kickoff_at))
 
     async def save_prediction(

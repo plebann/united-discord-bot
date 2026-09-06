@@ -35,18 +35,23 @@ class AnnouncementService:
         opening = match.can_predict(current_time)
         if opening:
             content = (
-                f"Skonfigurowano mecz i rozpoczęto typowanie: "
-                f"{match.home_team} - {match.away_team}\n"
-                f"Rozgrywki: {match.competition}\n"
-                f"Kick-off: <t:{int(match.kickoff_at.timestamp())}:f>\n"
-                "Typowanie już aktywne!"
+                f"# ⚽ NADCHODZĄCY MECZ\n"
+                f"## {match.home_team} vs {match.away_team}\n\n"
+                f"🏆 **Rozgrywki:** {match.competition}\n"
+                f"🕐 **Kick-off:** <t:{int(match.kickoff_at.timestamp())}:f>\n"
+                f"🟢 **Typowanie aktywne!**\n\n"
+                "Wpisz `/typ 3:1`, aby zapisać swój typ.\n"
+                "-# Typowanie zamknie się wraz z pierwszym gwizdkiem."
             )
         else:
             content = (
-                f"Skonfigurowano mecz: {match.home_team} - {match.away_team}\n"
-                f"Rozgrywki: {match.competition}\n"
-                f"Kick-off: <t:{int(match.kickoff_at.timestamp())}:f>\n"
-                f"Typowanie rozpocznie się <t:{int(match.prediction_opens_at.timestamp())}:f>."
+                f"# ⚽ NADCHODZĄCY MECZ\n"
+                f"## {match.home_team} vs {match.away_team}\n\n"
+                f"🏆 **Rozgrywki:** {match.competition}\n"
+                f"🕐 **Kick-off:** <t:{int(match.kickoff_at.timestamp())}:f>\n"
+                f"🟢 **Typowanie rozpocznie się 3 dni przed pierwszym gwizdkiem!**\n\n"
+                "Wpisz `/typ 3:1`, aby zapisać swój typ.\n"
+                "-# Typowanie zamknie się wraz z pierwszym gwizdkiem."
             )
         await self._publish_once(match, MATCH_CONFIGURED, content, current_time)
         if opening:
@@ -78,17 +83,33 @@ class AnnouncementService:
     ) -> None:
         current_time = now or utc_now()
         if updated.can_predict(current_time):
-            state = "Typowanie już aktywne!"
+            content = (
+                f"Zmieniono termin meczu i rozpoczęto typowanie: "
+                f"{updated.home_team} - {updated.away_team}\n"
+                f"Rozgrywki: {updated.competition}\n"
+                f"Poprzedni kick-off: <t:{int(previous.kickoff_at.timestamp())}:f>\n"
+                f"Nowy kick-off: <t:{int(updated.kickoff_at.timestamp())}:f>\n"
+                "Typowanie już aktywne!"
+            )
+        elif updated.kickoff_at <= current_time:
+            content = (
+                f"Zmieniono termin meczu: {updated.home_team} - {updated.away_team}\n"
+                f"Rozgrywki: {updated.competition}\n"
+                f"Poprzedni kick-off: <t:{int(previous.kickoff_at.timestamp())}:f>\n"
+                f"Nowy kick-off: <t:{int(updated.kickoff_at.timestamp())}:f>\n"
+                "Czas typowania minął."
+            )
         else:
-            state = (
+            content = (
+                f"Zmieniono termin meczu: {updated.home_team} - {updated.away_team}\n"
+                f"Rozgrywki: {updated.competition}\n"
+                f"Poprzedni kick-off: <t:{int(previous.kickoff_at.timestamp())}:f>\n"
+                f"Nowy kick-off: <t:{int(updated.kickoff_at.timestamp())}:f>\n"
                 f"Typowanie rozpocznie się "
                 f"<t:{int(updated.prediction_opens_at.timestamp())}:f>."
             )
         await self.publisher.publish(
-            f"Zmieniono termin meczu {updated.home_team} - {updated.away_team}\n"
-            f"Poprzedni kick-off: <t:{int(previous.kickoff_at.timestamp())}:f>\n"
-            f"Nowy kick-off: <t:{int(updated.kickoff_at.timestamp())}:f>\n"
-            f"{state}"
+            content
         )
         if updated.can_predict(current_time):
             await self._mark_once(updated, PREDICTION_OPENED, current_time)
