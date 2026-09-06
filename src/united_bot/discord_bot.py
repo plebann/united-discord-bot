@@ -99,6 +99,7 @@ class TyperCog(commands.Cog):
             )
             await interaction.response.defer()
             await self.announcements.publish_match_configured(match)
+            await _acknowledge_announcement(interaction)
             logger.info(
                 "Dodano mecz #%s na guildzie %s: %s - %s",
                 match.id,
@@ -128,6 +129,7 @@ class TyperCog(commands.Cog):
             )
             await interaction.response.defer()
             await self.announcements.publish_match_edited(previous, match)
+            await _acknowledge_announcement(interaction)
             logger.info("Zmieniono kickoff meczu #%s na guildzie %s", match.id, match.guild_id)
         except (DomainError, LookupError, RuntimeError, discord.DiscordException) as exc:
             await _send_command_error(interaction, exc)
@@ -149,6 +151,7 @@ class TyperCog(commands.Cog):
             )
             await interaction.response.defer()
             await self.announcements.publish_result(match, predictions)
+            await _acknowledge_announcement(interaction)
             logger.info(
                 "Zapisano wynik meczu #%s na guildzie %s: %s:%s",
                 match.id,
@@ -327,6 +330,19 @@ async def _send_command_error(
         await interaction.followup.send(str(error), ephemeral=True)
     else:
         await interaction.response.send_message(str(error), ephemeral=True)
+
+
+async def _acknowledge_announcement(interaction: discord.Interaction) -> None:
+    if interaction.response.is_done():
+        await interaction.followup.send(
+            "Ogłoszenie zostało opublikowane.",
+            ephemeral=True,
+        )
+    else:
+        await interaction.response.send_message(
+            "Ogłoszenie zostało opublikowane.",
+            ephemeral=True,
+        )
 
 
 def _split_messages(content: str, limit: int = 1900) -> list[str]:
