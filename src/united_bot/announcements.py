@@ -9,6 +9,7 @@ from .domain import Match, Prediction, utc_now
 
 MATCH_CONFIGURED = "MATCH_CONFIGURED"
 PREDICTION_OPENED = "PREDICTION_OPENED"
+MATCH_STARTED = "MATCH_STARTED"
 
 
 class AnnouncementPublisher(Protocol):
@@ -72,8 +73,24 @@ class AnnouncementService:
 
     async def poll(self, now: datetime | None = None) -> None:
         current_time = now or utc_now()
+        for match in await self.matches.list_started_due(current_time):
+            await self.publish_match_started(match, current_time)
         for match in await self.matches.list_prediction_open_due(current_time):
             await self.publish_prediction_opened(match, current_time)
+
+    async def publish_match_started(
+        self,
+        match: Match,
+        now: datetime | None = None,
+    ) -> None:
+        current_time = now or utc_now()
+        content = (
+            f"Mecz rozpoczęty: {match.home_team} - {match.away_team}\n"
+            f"Rozgrywki: {match.competition}\n"
+            f"Kick-off: <t:{int(match.kickoff_at.timestamp())}:f>\n"
+            "Typowanie zamknięte."
+        )
+        await self._publish_once(match, MATCH_STARTED, content, current_time)
 
     async def publish_match_edited(
         self,

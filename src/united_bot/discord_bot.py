@@ -150,6 +150,7 @@ class TyperCog(commands.Cog):
                 Score.parse(wynik),
             )
             await interaction.response.defer()
+            await self.announcements.publish_match_started(match)
             await self.announcements.publish_result(match, predictions)
             await _acknowledge_announcement(interaction)
             logger.info(

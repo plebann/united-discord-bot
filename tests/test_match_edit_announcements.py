@@ -52,3 +52,22 @@ async def test_edit_announcement_keeps_typing_scheduled_beyond_three_days() -> N
 
     assert "Zmieniono termin meczu:" in publisher.messages[0]
     assert "Typowanie rozpocznie się" in publisher.messages[0]
+
+
+@pytest.mark.asyncio
+async def test_match_started_announcement_closes_prediction_window() -> None:
+    now = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    match = Match(
+        1, 1, "Everton", "Manchester United", "Premier League", now
+    )
+    publisher = Publisher()
+    service = AnnouncementService(None, Announcements(), publisher)  # type: ignore[arg-type]
+
+    await service.publish_match_started(match, now)
+
+    assert publisher.messages == [
+        "Mecz rozpoczęty: Everton - Manchester United\n"
+        "Rozgrywki: Premier League\n"
+        "Kick-off: <t:1893456000:f>\n"
+        "Typowanie zamknięte."
+    ]

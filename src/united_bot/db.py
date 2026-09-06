@@ -176,6 +176,20 @@ class MatchRepository:
             ).all()
             return [self._to_domain(row) for row in rows]
 
+    async def list_started_due(self, now: datetime) -> list[Match]:
+        async with self._session_factory() as session:
+            rows = (
+                await session.scalars(
+                    select(MatchRow)
+                    .where(
+                        MatchRow.status == MatchStatus.SCHEDULED.value,
+                        MatchRow.kickoff_at <= now,
+                    )
+                    .order_by(MatchRow.kickoff_at)
+                )
+            ).all()
+            return [self._to_domain(row) for row in rows]
+
     async def update(self, match: Match) -> Match:
         if match.id is None:
             raise ValueError("Nie można aktualizować meczu bez identyfikatora.")
