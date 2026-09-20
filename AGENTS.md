@@ -99,6 +99,18 @@ Do not delete or rewrite settled behaviours while adding new ones; extend the
 frozen dataclasses via new methods (`with_*`, `finish` style) rather than mutating
 state.
 
+## Business rule placement — deliberate, with an escape hatch
+
+Business rules currently live where they were born: `ensure_kickoff_in_future` in
+`domain.py`, the Manchester United check inside `TyperService.add_match`. There is
+no dedicated rules module, and that is a **conscious decision**, not an oversight:
+with only two such rules, a separate module would be structure without leverage.
+
+If the next business rule arrives, do not add it beside the others — restructure
+first: create a single home for operational rules (a `rules` module or equivalent)
+and move the existing rules into it as part of the same change. Until then, treat
+the current placement as intentional; do not "tidy" it prematurely.
+
 ## Discord API discipline
 
 Facts about the platform that are easy to get wrong (see
