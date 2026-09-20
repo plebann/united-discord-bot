@@ -16,7 +16,11 @@ from .db import (
     create_schema,
     create_session_factory,
 )
-from .discord_bot import DiscordAnnouncementPublisher, create_bot
+from .discord_bot import (
+    DiscordAnnouncementPublisher,
+    DiscordDisplayNameResolver,
+    create_bot,
+)
 from .logging_setup import configure_logging
 
 logger = logging.getLogger(__name__)
@@ -36,12 +40,15 @@ async def run() -> None:
         PredictionRepository(session_factory),
     )
     publisher = DiscordAnnouncementPublisher()
+    name_resolver = DiscordDisplayNameResolver()
     announcements = AnnouncementService(
         service.matches,
+        service.predictions,
         AnnouncementRepository(session_factory),
         publisher,
+        name_resolver,
     )
-    bot = await create_bot(service, announcements, publisher)
+    bot = await create_bot(service, announcements, publisher, name_resolver)
     await bot.start(token)
 
 

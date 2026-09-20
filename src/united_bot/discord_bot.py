@@ -9,15 +9,13 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from .announcements import AnnouncementService
+from .announcements import AnnouncementService, prediction_listing_text
 from .application import TyperService
 from .domain import (
     DomainError,
     Match,
     Prediction,
-    ResultType,
     Score,
-    result_type,
 )
 
 logger = logging.getLogger(__name__)
@@ -47,7 +45,34 @@ class DiscordAnnouncementPublisher:
             channel = await self.bot.fetch_channel(int(configured_channel))
         if not hasattr(channel, "send"):
             raise RuntimeError("Skonfigurowany kanał nie obsługuje wysyłania wiadomości.")
-        await channel.send(content)
+        for chunk in _split_messages(content):
+            await channel.send(chunk)
+
+
+class DiscordDisplayNameResolver:
+    """Ustala czytelne nazwy użytkowników bez pingu (nickname → username)."""
+
+    def __init__(self) -> None:
+        self.bot: commands.Bot | None = None
+
+    async def resolve(self, guild_id: int, user_ids: list[int]) -> dict[int, str]:
+        if self.bot is None or not user_ids:
+            return {}
+        try:
+            guild = self.bot.get_guild(guild_id)
+            if guild is None:
+                guild = await self.bot.fetch_guild(guild_id)
+        except discord.DiscordException:
+            logger.exception("Nie udało się ustalić serwera %s dla nazw typujących", guild_id)
+            return {}
+        names: dict[int, str] = {}
+        for user_id in dict.fromkeys(user_ids):
+            try:
+                member = await guild.fetch_member(user_id)
+            except discord.DiscordException:
+                continue
+            names[user_id] = member.display_name
+        return names
 
 
 def configured_channel_check(interaction: discord.Interaction) -> bool:
@@ -303,39 +328,19 @@ class UserTyperCog(commands.Cog):
             await _send_command_error(interaction, exc)
 
 
-LISTING_GROUP_HEADINGS = {
-    ResultType.HOME_WIN: "🔵 Wygrana gospodarzy",
-    ResultType.DRAW: "⚪ Remis",
-    ResultType.AWAY_WIN: "🔴 Wygrana gości",
-}
-
-
 def build_prediction_listing(match: Match, predictions: list[Prediction]) -> str:
-    lines = [f"Typy na mecz {match.home_team} - {match.away_team}"]
-    groups: dict[ResultType, list[Prediction]] = {
-        ResultType.HOME_WIN: [],
-        ResultType.DRAW: [],
-        ResultType.AWAY_WIN: [],
-    }
-    for prediction in predictions:
-        groups[result_type(prediction.score)].append(prediction)
-    for result_type_group in (ResultType.HOME_WIN, ResultType.DRAW, ResultType.AWAY_WIN):
-        group = groups[result_type_group]
-        if not group:
-            continue
-        lines.append("")
-        lines.append(LISTING_GROUP_HEADINGS[result_type_group])
-        lines.extend(
-            f"{index}. <@{prediction.user_id}> — {prediction.score.home}:{prediction.score.away}"
-            for index, prediction in enumerate(group, start=1)
-        )
-    return "\n".join(lines)
+    return prediction_listing_text(
+        match,
+        predictions,
+        lambda user_id: f"<@{user_id}>",
+    )
 
 
 async def create_bot(
     service: TyperService,
     announcements: AnnouncementService,
     publisher: DiscordAnnouncementPublisher,
+    name_resolver: DiscordDisplayNameResolver | None = None,
 ) -> commands.Bot:
     intents = discord.Intents.none()
     bot = commands.Bot(command_prefix="!", intents=intents)
@@ -379,6 +384,8 @@ async def create_bot(
         logger.error("Błąd komendy aplikacji: %s", error)
 
     publisher.bot = bot
+    if name_resolver is not None:
+        name_resolver.bot = bot
     return bot
 
 
