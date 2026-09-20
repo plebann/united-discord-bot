@@ -398,6 +398,27 @@ Wygrana gości
 0:2   (różnica 2)
 ```
 
+### Publiczna lista w ogłoszeniu startu meczu
+
+Ogłoszenie „Mecz rozpoczęty…" (typ `MATCH_STARTED`) zawiera tę samą listę typów
+(jedno wspólne źródło prawdy prezentacji), bezpośrednio po linii „Typowanie
+zamknięte.". W tym momencie okno typowania jest zamknięte, więc lista jest
+pełna i ostateczna. Ogłoszenie wysyłane jest raz na mecz (deduplikacja po typie
+ogłoszenia).
+
+Rozbieżność względem `/wszystkie-typy` dotyczy wyłącznie tego, jak
+prezentowany jest typujący:
+
+- publicznie nie ma pingu, więc zamiast `<@id>` drukowana jest czytelna nazwa;
+- kolejność próbowanych nazw: **nickname z serwera** → globalny username →
+  `<@id>` (gdy żadnej nazwy nie da się ustalić — degradacja tylko jednej
+  linii, reszta listy zostaje z nazwami);
+- lista mieści się w jednej wiadomości; gdy przekroczy limit długości Discorda,
+  pozostała część idzie jako kolejne publiczne wiadomości.
+
+Przy zerze typów miejsce listy zajmuje linia:
+`Nikt jeszcze nie typował na mecz {gospodarze} - {goście}.`
+
 ## 8. Testy domenowe
 
 Przed integracją z Discordem i SQLite należy pokryć testami przynajmniej:
@@ -443,4 +464,12 @@ typy: 0:2, 1:1, 3:0, 4:2, 2:2, 2:0
 
 identyczne typy 2:0 złożone o 18:00 i 18:01
 → typ z 18:00 wyżej (kolejność złożenia)
+
+ogłoszenie startu meczu (MATCH_STARTED) z typami 0:2 (nick „Kowalski"),
+1:1 (nazwa niedostępna), 3:0 (nick „Nowak")
+→ sekcja listy: 3:0 — Nowak, 1:1 — <@id>, 0:2 — Kowalski
+  (nazwa per-użytkownik; brak nazwy degraduje tylko swoją linię)
+
+ogłoszenie startu meczu przy zerze typów
+→ linia „Nikt jeszcze nie typował na mecz {gospodarze} - {goście}."
 ```
