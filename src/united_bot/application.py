@@ -112,7 +112,9 @@ class TyperService:
         now: datetime | None = None,
     ) -> tuple[Match | None, list[Prediction]]:
         current_time = now or utc_now()
-        match = await self.matches.get_current(guild_id, current_time)
+        match = await self.matches.get_in_progress(guild_id, current_time)
+        if match is None:
+            match = await self.matches.get_current(guild_id, current_time)
         if match is None:
             return None, []
         predictions = await self.predictions.list_for_match(match.id)

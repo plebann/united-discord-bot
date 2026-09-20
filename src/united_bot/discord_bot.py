@@ -16,6 +16,7 @@ from .domain import (
     Match,
     Prediction,
     Score,
+    utc_now,
 )
 
 logger = logging.getLogger(__name__)
@@ -309,13 +310,7 @@ class UserTyperCog(commands.Cog):
                     ephemeral=True,
                 )
                 return
-            if not predictions:
-                await interaction.followup.send(
-                    f"Nikt jeszcze nie typował na mecz {match.home_team} - {match.away_team}.",
-                    ephemeral=True,
-                )
-                return
-            chunks = _split_messages(build_prediction_listing(match, predictions))
+            chunks = _split_messages(format_all_predictions(match, predictions, utc_now()))
             for chunk in chunks:
                 await interaction.followup.send(chunk, ephemeral=True)
             logger.info(
@@ -334,6 +329,20 @@ def build_prediction_listing(match: Match, predictions: list[Prediction]) -> str
         predictions,
         lambda user_id: f"<@{user_id}>",
     )
+
+
+def format_all_predictions(match: Match, predictions: list[Prediction], now: datetime) -> str:
+    message = (
+        build_prediction_listing(match, predictions)
+        if predictions
+        else f"Nikt jeszcze nie typował na mecz {match.home_team} - {match.away_team}."
+    )
+    if match.kickoff_at <= now:
+        message = (
+            f"\u26bd Mecz {match.home_team} - {match.away_team} trwa — "
+            f"typowanie zamknięte.\n{message}"
+        )
+    return message
 
 
 async def create_bot(
