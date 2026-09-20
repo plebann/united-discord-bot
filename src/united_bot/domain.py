@@ -133,6 +133,47 @@ class Prediction:
     updated_at: datetime | None = None
 
 
+_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
+def prediction_listing_key(prediction: Prediction) -> tuple[int, int, int, int, bool, datetime]:
+    score = prediction.score
+    if score.home > score.away:
+        group, goal_difference, winner_goals, loser_goals = (
+            0,
+            score.home - score.away,
+            score.home,
+            score.away,
+        )
+    elif score.home < score.away:
+        group, goal_difference, winner_goals, loser_goals = (
+            2,
+            score.away - score.home,
+            score.away,
+            score.home,
+        )
+    else:
+        group, goal_difference, winner_goals, loser_goals = (
+            1,
+            0,
+            score.home + score.away,
+            0,
+        )
+    submitted_at = prediction.submitted_at
+    return (
+        group,
+        -goal_difference,
+        -winner_goals,
+        -loser_goals,
+        submitted_at is None,
+        submitted_at or _EPOCH,
+    )
+
+
+def sort_predictions_for_listing(predictions: list[Prediction]) -> list[Prediction]:
+    return sorted(predictions, key=prediction_listing_key)
+
+
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 

@@ -3,7 +3,15 @@ from __future__ import annotations
 from datetime import datetime
 
 from .db import MatchRepository, PredictionRepository
-from .domain import DomainError, Match, Prediction, Score, ensure_kickoff_in_future, utc_now
+from .domain import (
+    DomainError,
+    Match,
+    Prediction,
+    Score,
+    ensure_kickoff_in_future,
+    sort_predictions_for_listing,
+    utc_now,
+)
 
 
 class TyperService:
@@ -97,6 +105,18 @@ class TyperService:
             return None, None
         previous = await self.predictions.get_latest_for_user(guild_id, user_id)
         return previous if previous is not None else (None, None)
+
+    async def list_predictions(
+        self,
+        guild_id: int,
+        now: datetime | None = None,
+    ) -> tuple[Match | None, list[Prediction]]:
+        current_time = now or utc_now()
+        match = await self.matches.get_current(guild_id, current_time)
+        if match is None:
+            return None, []
+        predictions = await self.predictions.list_for_match(match.id)
+        return match, sort_predictions_for_listing(predictions)
 
     async def finish_match(
         self,

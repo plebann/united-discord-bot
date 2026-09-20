@@ -11,7 +11,14 @@ from discord.ext import commands, tasks
 
 from .announcements import AnnouncementService
 from .application import TyperService
-from .domain import DomainError, Score
+from .domain import (
+    DomainError,
+    Match,
+    Prediction,
+    ResultType,
+    Score,
+    result_type,
+)
 
 logger = logging.getLogger(__name__)
 LOCAL_TIMEZONE = ZoneInfo("Europe/Warsaw")
@@ -48,9 +55,7 @@ def configured_channel_check(interaction: discord.Interaction) -> bool:
     if not configured_channel.isdigit() or int(configured_channel) <= 0:
         raise ChannelCheckFailure(CHANNEL_CONFIGURATION_ERROR)
     if interaction.guild is None:
-        raise ChannelCheckFailure(
-            "Ta komenda działa tylko na skonfigurowanym kanale serwera."
-        )
+        raise ChannelCheckFailure("Ta komenda działa tylko na skonfigurowanym kanale serwera.")
     if interaction.channel_id != int(configured_channel):
         raise ChannelCheckFailure(
             f"Tej komendy można używać tylko na kanale <#{configured_channel}>."
@@ -200,10 +205,7 @@ class UserTyperCog(commands.Cog):
                 interaction.user.id,
                 Score.parse(wynik),
             )
-            if (
-                previous_prediction is not None
-                and previous_prediction.score == prediction.score
-            ):
+            if previous_prediction is not None and previous_prediction.score == prediction.score:
                 await interaction.response.send_message(
                     "Typ nie został zmieniony.",
                     ephemeral=True,
@@ -223,9 +225,7 @@ class UserTyperCog(commands.Cog):
                     f"Poprzednio: {previous_prediction.score.home}:"
                     f"{previous_prediction.score.away}"
                 )
-            await interaction.response.send_message(
-                announcement
-            )
+            await interaction.response.send_message(announcement)
             logger.info(
                 "Zapisano typ użytkownika %s dla meczu #%s na guildzie %s",
                 interaction.user.id,
@@ -254,9 +254,7 @@ class UserTyperCog(commands.Cog):
                 message = f"Nie masz jeszcze typu dla meczu #{match.id}."
             else:
                 points = (
-                    f"{prediction.points} pkt"
-                    if prediction.points is not None
-                    else "nierozliczony"
+                    f"{prediction.points} pkt" if prediction.points is not None else "nierozliczony"
                 )
                 if match.final_score is not None:
                     message = (
@@ -273,6 +271,65 @@ class UserTyperCog(commands.Cog):
             await interaction.response.send_message(message, ephemeral=True)
         except (DomainError, LookupError) as exc:
             await interaction.response.send_message(str(exc), ephemeral=True)
+
+    @app_commands.command(name="wszystkie-typy")
+    @app_commands.check(configured_channel_check)
+    async def all_predictions(self, interaction: discord.Interaction) -> None:
+        try:
+            await interaction.response.defer()
+            match, predictions = await self.service.list_predictions(interaction.guild_id or 0)
+            if match is None:
+                await interaction.followup.send(
+                    "Nie ma teraz aktywnego meczu do typowania.",
+                    ephemeral=True,
+                )
+                return
+            if not predictions:
+                await interaction.followup.send(
+                    f"Nikt jeszcze nie typował na mecz {match.home_team} - {match.away_team}.",
+                    ephemeral=True,
+                )
+                return
+            chunks = _split_messages(build_prediction_listing(match, predictions))
+            for chunk in chunks:
+                await interaction.followup.send(chunk, ephemeral=True)
+            logger.info(
+                "Wylistowano %d typów dla meczu #%s na guildzie %s",
+                len(predictions),
+                match.id,
+                interaction.guild_id,
+            )
+        except (DomainError, LookupError, RuntimeError, discord.DiscordException) as exc:
+            await _send_command_error(interaction, exc)
+
+
+LISTING_GROUP_HEADINGS = {
+    ResultType.HOME_WIN: "🔵 Wygrana gospodarzy",
+    ResultType.DRAW: "⚪ Remis",
+    ResultType.AWAY_WIN: "🔴 Wygrana gości",
+}
+
+
+def build_prediction_listing(match: Match, predictions: list[Prediction]) -> str:
+    lines = [f"Typy na mecz {match.home_team} - {match.away_team}"]
+    groups: dict[ResultType, list[Prediction]] = {
+        ResultType.HOME_WIN: [],
+        ResultType.DRAW: [],
+        ResultType.AWAY_WIN: [],
+    }
+    for prediction in predictions:
+        groups[result_type(prediction.score)].append(prediction)
+    for result_type_group in (ResultType.HOME_WIN, ResultType.DRAW, ResultType.AWAY_WIN):
+        group = groups[result_type_group]
+        if not group:
+            continue
+        lines.append("")
+        lines.append(LISTING_GROUP_HEADINGS[result_type_group])
+        lines.extend(
+            f"{index}. <@{prediction.user_id}> — {prediction.score.home}:{prediction.score.away}"
+            for index, prediction in enumerate(group, start=1)
+        )
+    return "\n".join(lines)
 
 
 async def create_bot(

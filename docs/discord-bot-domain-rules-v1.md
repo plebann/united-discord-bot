@@ -343,6 +343,61 @@ Do doprecyzowania w kolejnej iteracji:
 - zachowanie przy czerwonej kartce;
 - minimalna jakość danych konieczna do otwarcia ocen.
 
+## Prezentacja listy typów
+
+Komenda `/wszystkie-typy` zwraca prywatną listę wszystkich typów złożonych na
+bieżący mecz (mecz z otwartym oknem typowania, ten sam co `/typ`). Lista jest
+posortowana według własnego przewidywanego rezultatu każdego typu, a następnie
+według liczby bramek:
+
+### Kolejność grup
+
+Grupy są prezentowane w stałej kolejności:
+
+```text
+1. Wygrana gospodarzy  — typ, w którym gole_gospodarzy > gole_goście
+2. Remis               — typ, w którym gole_gospodarzy = gole_goście
+3. Wygrana gości       — typ, w którym gole_goście > gole_gospodarzy
+```
+
+Kolejność grup wynika z wyniku typowanego (rezultat), nie z faktycznego wyniku
+meczu — komenda działa przed rozliczeniem i porządkuje typy tak, jak je
+przewidział użytkownik.
+
+### Sortowanie wewnątrz grupy
+
+W obrębie tej samej grupy typy są sortowane malejąco po:
+
+1. różnicy bramek na korzyść zwycięzcy (`|gospodarze - goście|`);
+2. liczbie goli strzelonych przez zwycięzcę;
+3. liczbie goli strzelonych przez przegranego.
+
+Dla remisu jedynym kryterium jest suma goli w typie (`gospodarze + goście`).
+
+### Łamanie pełnego remisu kryteriów
+
+Jeśli dwa typy mają identyczny wynik i identyczne wartości wszystkich kryteriów,
+porządek wyznacza czas złożenia typu (`submitted_at` rosnąco) — najpierw
+złożony typ pojawia się wyżej.
+
+### Przykład
+
+Dla typów `3:0`, `4:2`, `2:0`, `2:2`, `1:1`, `0:2` lista wygląda tak:
+
+```text
+Wygrana gospodarzy
+3:0   (różnica 3)
+4:2   (różnica 2, gole zwycięzcy 4)
+2:0   (różnica 2, gole zwycięzcy 2)
+
+Remis
+2:2   (4 gole)
+1:1   (2 gole)
+
+Wygrana gości
+0:2   (różnica 2)
+```
+
 ## 8. Testy domenowe
 
 Przed integracją z Discordem i SQLite należy pokryć testami przynajmniej:
@@ -376,4 +431,16 @@ start 0, end 63    → 63
 5 minut → false
 6 minut → true
 95 minut → true
+```
+
+### Sortowanie listy typów
+
+```text
+typy: 0:2, 1:1, 3:0, 4:2, 2:2, 2:0
+→ 3:0, 4:2, 2:0, 2:2, 1:1, 0:2
+  (grupa gospodarzy: różnica goli, gole zwycięzcy;
+   remis: suma goli; goście: różnica goli)
+
+identyczne typy 2:0 złożone o 18:00 i 18:01
+→ typ z 18:00 wyżej (kolejność złożenia)
 ```

@@ -11,6 +11,8 @@ Komendy:
 
 - `/typ wynik:<gospodarze>:<goście>`
 - `/moj-typ`
+- `/wszystkie-typy` — prywatna lista wszystkich typów na bieżący mecz, posortowana
+  wg wyniku i bramek (wygrana gospodarzy, remis, wygrana gości)
 - `/admin-mecz-dodaj gospodarze:<nazwa> goscie:<nazwa> rozgrywki:<nazwa> kickoff:<data>`
 - `/admin-mecz-edytuj kickoff:<data>`
 - `/admin-mecz-wynik wynik:<gospodarze>:<goście>`

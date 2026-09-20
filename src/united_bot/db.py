@@ -246,6 +246,15 @@ class PredictionRepository:
             )
             return self._to_domain(row) if row else None
 
+    async def list_for_match(self, match_id: int) -> list[Prediction]:
+        async with self._session_factory() as session:
+            rows = (
+                await session.scalars(
+                    select(PredictionRow).where(PredictionRow.match_id == match_id)
+                )
+            ).all()
+            return [self._to_domain(row) for row in rows]
+
     async def get_latest_for_user(
         self,
         guild_id: int,
