@@ -1,10 +1,18 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
 from typing import Protocol
 
-from .db import AnnouncementRepository, MatchRepository
-from .domain import Match, Prediction, utc_now
+from .db import AnnouncementRepository, MatchRepository, PredictionRepository
+from .domain import (
+    Match,
+    Prediction,
+    ResultType,
+    result_type,
+    sort_predictions_for_listing,
+    utc_now,
+)
 
 MATCH_CONFIGURED = "MATCH_CONFIGURED"
 PREDICTION_OPENED = "PREDICTION_OPENED"
@@ -15,16 +23,64 @@ class AnnouncementPublisher(Protocol):
     async def publish(self, content: str) -> None: ...
 
 
+class DisplayNameResolver(Protocol):
+    async def resolve(self, guild_id: int, user_ids: list[int]) -> dict[int, str]: ...
+
+
+LISTING_GROUP_HEADINGS = {
+    ResultType.HOME_WIN: "\U0001f535 Wygrana gospodarzy",
+    ResultType.DRAW: "\u26aa Remis",
+    ResultType.AWAY_WIN: "\U0001f534 Wygrana gości",
+}
+
+
+def prediction_listing_text(
+    match: Match,
+    predictions: list[Prediction],
+    display_user: Callable[[int], str],
+) -> str:
+    if not predictions:
+        return f"Nikt jeszcze nie typował na mecz {match.home_team} - {match.away_team}."
+    lines = [f"Typy na mecz {match.home_team} - {match.away_team}"]
+    groups: dict[ResultType, list[Prediction]] = {
+        ResultType.HOME_WIN: [],
+        ResultType.DRAW: [],
+        ResultType.AWAY_WIN: [],
+    }
+    for prediction in predictions:
+        groups[result_type(prediction.score)].append(prediction)
+    for result_type_group in (
+        ResultType.HOME_WIN,
+        ResultType.DRAW,
+        ResultType.AWAY_WIN,
+    ):
+        group = groups[result_type_group]
+        if not group:
+            continue
+        lines.append("")
+        lines.append(LISTING_GROUP_HEADINGS[result_type_group])
+        lines.extend(
+            f"{index}. {display_user(prediction.user_id)} — "
+            f"{prediction.score.home}:{prediction.score.away}"
+            for index, prediction in enumerate(group, start=1)
+        )
+    return "\n".join(lines)
+
+
 class AnnouncementService:
     def __init__(
         self,
         matches: MatchRepository,
+        predictions: PredictionRepository,
         announcements: AnnouncementRepository,
         publisher: AnnouncementPublisher,
+        display_names: DisplayNameResolver | None = None,
     ) -> None:
         self.matches = matches
+        self.predictions = predictions
         self.announcements = announcements
         self.publisher = publisher
+        self.display_names = display_names
 
     async def publish_match_configured(
         self,
@@ -83,13 +139,31 @@ class AnnouncementService:
         now: datetime | None = None,
     ) -> None:
         current_time = now or utc_now()
+        if await self.announcements.was_sent(match.id, MATCH_STARTED):
+            return
+        predictions = sort_predictions_for_listing(await self.predictions.list_for_match(match.id))
+        names = await self._resolve_names(
+            match.guild_id, [prediction.user_id for prediction in predictions]
+        )
+        listing = prediction_listing_text(
+            match,
+            predictions,
+            lambda user_id: names.get(user_id) or f"<@{user_id}>",
+        )
         content = (
             f"Mecz rozpoczęty: {match.home_team} - {match.away_team}\n"
             f"Rozgrywki: {match.competition}\n"
             f"Kick-off: <t:{int(match.kickoff_at.timestamp())}:f>\n"
-            "Typowanie zamknięte."
+            "Typowanie zamknięte.\n\n"
+            f"{listing}"
         )
-        await self._publish_once(match, MATCH_STARTED, content, current_time)
+        await self.publisher.publish(content)
+        await self.announcements.mark_sent(match.id, MATCH_STARTED, current_time)
+
+    async def _resolve_names(self, guild_id: int, user_ids: list[int]) -> dict[int, str]:
+        if self.display_names is None or not user_ids:
+            return {}
+        return await self.display_names.resolve(guild_id, user_ids)
 
     async def publish_match_edited(
         self,
@@ -124,9 +198,7 @@ class AnnouncementService:
                 f"Typowanie rozpocznie się "
                 f"<t:{int(updated.prediction_opens_at.timestamp())}:f>."
             )
-        await self.publisher.publish(
-            content
-        )
+        await self.publisher.publish(content)
         if updated.can_predict(current_time):
             await self._mark_once(updated, PREDICTION_OPENED, current_time)
 
