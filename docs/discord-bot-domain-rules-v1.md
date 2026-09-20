@@ -2,8 +2,8 @@
 
 ## Status
 
-- Wersja: 1.1
-- Zakres: punktacja typowania, walidacja terminu meczu oraz definicja czasu gry zawodników
+- Wersja: 1.2
+- Zakres: punktacja typowania, walidacja terminu meczu, ograniczenie liczby nierozliczonych meczów oraz definicja czasu gry zawodników
 - Cel: jednoznaczna podstawa do implementacji i testów domenowych
 
 ## 1. Słownik pojęć
@@ -225,6 +225,31 @@ kickoff = now           → odrzucone
 kickoff = now + 1 min   → przyjęte
 ```
 
+## Ograniczenie liczby nierozliczonych meczów
+
+### Reguła — tylko jeden nierozliczony mecz naraz
+
+W ramach jednej gildii może istnieć co najwyżej jeden mecz nierozliczony
+(`status == SCHEDULED`), niezależnie od tego, czy jego kickoff jeszcze nie
+nastąpił. Próba dodania kolejnego meczu (`/admin-mecz-dodaj`) w sytuacji, gdy
+taki mecz istnieje, jest odrzucana:
+
+```text
+Mecz {gospodarze} - {goście} nie został jeszcze rozliczony. Zamknij go przed dodaniem kolejnego spotkania.
+```
+
+Gdy istnieje więcej niż jeden nierozliczony mecz (możliwe wyłącznie w danych
+zainstalowanych przed tą wersją), komunikat nazywa mecz o najwcześniejszym
+kickoffie.
+
+Kolejność walidacji przy dodawaniu: 1) udział Manchester United,
+2) kickoff w przyszłości, 3) brak innego nierozliczonego meczu.
+
+Naprawa stanu z kilkoma nierozliczonymi meczami: rozpoczęte mecze rozlicza
+`/admin-mecz-wynik`, a mecze o terminie w przyszłości usuwa administrator ręcznie
+w bazie SQLite. Dodawanie pozostaje zablokowane, dopóki stan nie zostanie
+naprawiony do jednego nierozliczonego meczu lub ich braku.
+
 ## 5. Przypadki wymagające późniejszej decyzji
 
 Przed wdrożeniem rozliczania automatycznego trzeba zdefiniować zasady dla:
@@ -346,9 +371,22 @@ Do doprecyzowania w kolejnej iteracji:
 ## Prezentacja listy typów
 
 Komenda `/wszystkie-typy` zwraca prywatną listę wszystkich typów złożonych na
-bieżący mecz (mecz z otwartym oknem typowania, ten sam co `/typ`). Lista jest
-posortowana według własnego przewidywanego rezultatu każdego typu, a następnie
-według liczby bramek:
+docelowy mecz, ustalany w tej kolejności:
+
+1. **Mecz trwający** (rozpoczęty, nierozliczony) — ma pierwszeństwo nawet nad
+   przyszłym meczem, którego okno typowania jest już otwarte;
+2. inaczej **mecz z otwartym oknem typowania** (ten sam co `/typ`).
+
+Gdy żaden mecz nie spełnia powyższych warunków (np. po rozliczeniu i przed
+otwarciem okna następnego meczu), komenda odpowiada:
+`Nie ma teraz aktywnego meczu do typowania.`
+
+Gdy docelowy mecz trwa, lista (także linia „Nikt jeszcze nie typował…”) jest
+poprzedzona nagłówkiem:
+`⚽ Mecz {gospodarze} - {goście} trwa — typowanie zamknięte.`
+
+Lista jest posortowana według własnego przewidywanego rezultatu każdego typu, a
+następnie według liczby bramek:
 
 ### Kolejność grup
 

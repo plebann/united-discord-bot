@@ -8,10 +8,10 @@ from .domain import (
     Match,
     Prediction,
     Score,
-    ensure_kickoff_in_future,
     sort_predictions_for_listing,
     utc_now,
 )
+from .rules import ensure_kickoff_in_future, ensure_man_utd_involvement, ensure_no_other_unresolved
 
 
 class TyperService:
@@ -33,9 +33,10 @@ class TyperService:
         now: datetime | None = None,
     ) -> Match:
         current_time = now or utc_now()
-        if "manchester united" not in {home_team.strip().lower(), away_team.strip().lower()}:
-            raise DomainError("Mecz musi obejmować Manchester United.")
+        ensure_man_utd_involvement(home_team, away_team)
         ensure_kickoff_in_future(kickoff_at, current_time)
+        existing = await self.matches.get_next_scheduled(guild_id)
+        ensure_no_other_unresolved(existing)
         return await self.matches.add(
             Match(
                 id=None,

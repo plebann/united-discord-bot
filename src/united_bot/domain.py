@@ -176,14 +176,3 @@ def sort_predictions_for_listing(predictions: list[Prediction]) -> list[Predicti
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def ensure_kickoff_in_future(
-    kickoff_at: datetime,
-    now: datetime,
-    message: str = "Kickoff musi być w przyszłości.",
-) -> None:
-    if kickoff_at.tzinfo is None or now.tzinfo is None:
-        raise DomainError("Kickoff i bieżący czas muszą zawierać strefę czasową.")
-    if not kickoff_at > now:
-        raise DomainError(message)

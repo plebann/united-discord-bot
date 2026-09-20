@@ -109,12 +109,17 @@ async def test_list_predictions_prefers_live_match_over_open_window_match(
         future_kickoff,
     )
     await service.save_prediction(1, 201, Score(1, 1), future_kickoff - timedelta(days=2))
-    await service.add_match(
-        1,
-        "Everton",
-        "Manchester United",
-        "Premier League",
-        live_kickoff,
+    # Reguła „jeden nierozliczony mecz” blokuje taki stan przez add_match;
+    # odtwarzamy dane zainstalowane przed tą regułą bezpośrednio w repozytorium.
+    await service.matches.add(
+        Match(
+            id=None,
+            guild_id=1,
+            home_team="Everton",
+            away_team="Manchester United",
+            competition="Premier League",
+            kickoff_at=live_kickoff,
+        )
     )
     await service.save_prediction(1, 101, Score(2, 0), live_kickoff - timedelta(hours=2))
 
