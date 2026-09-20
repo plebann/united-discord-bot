@@ -120,6 +120,9 @@ Facts about the platform that are easy to get wrong (see
 - An interaction gets a 3-second window for its initial response. Call
   `interaction.response.defer()` immediately when the handler does any I/O
   (database writes, publishing announcements), then answer via `followup.send`.
+  If the reply is private to the caller, defer with `ephemeral=True`: a plain
+  `defer()` marks the response public, and later `followup.send(...,
+  ephemeral=True)` calls will not carry the "Only you can see this" treatment.
 - Never do blocking or long-running work before deferring; a missed window
   surfaces to the user as "Interaction failed".
 - discord.py's rate-limit manager queues requests automatically — do not add your
