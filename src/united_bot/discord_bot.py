@@ -104,7 +104,7 @@ class TyperCog(commands.Cog):
                 rozgrywki,
                 parse_kickoff(kickoff),
             )
-            await interaction.response.defer()
+            await interaction.response.defer(ephemeral=True)
             await self.announcements.publish_match_configured(match)
             await _acknowledge_announcement(interaction)
             logger.info(
@@ -134,7 +134,7 @@ class TyperCog(commands.Cog):
                 interaction.guild_id or 0,
                 parse_kickoff(kickoff),
             )
-            await interaction.response.defer()
+            await interaction.response.defer(ephemeral=True)
             await self.announcements.publish_match_edited(previous, match)
             await _acknowledge_announcement(interaction)
             logger.info("Zmieniono kickoff meczu #%s na guildzie %s", match.id, match.guild_id)
@@ -156,7 +156,7 @@ class TyperCog(commands.Cog):
                 interaction.guild_id or 0,
                 Score.parse(wynik),
             )
-            await interaction.response.defer()
+            await interaction.response.defer(ephemeral=True)
             await self.announcements.publish_match_started(match)
             await self.announcements.publish_result(match, predictions)
             await _acknowledge_announcement(interaction)
@@ -276,7 +276,7 @@ class UserTyperCog(commands.Cog):
     @app_commands.check(configured_channel_check)
     async def all_predictions(self, interaction: discord.Interaction) -> None:
         try:
-            await interaction.response.defer()
+            await interaction.response.defer(ephemeral=True)
             match, predictions = await self.service.list_predictions(interaction.guild_id or 0)
             if match is None:
                 await interaction.followup.send(
