@@ -5,7 +5,6 @@ import pytest
 from united_bot.domain import (
     DomainError,
     Match,
-    MatchStatus,
     Score,
     calculate_prediction_points,
 )
@@ -48,7 +47,8 @@ def test_prediction_window_opens_three_days_before_kickoff() -> None:
 
 def test_finished_match_cannot_change_kickoff() -> None:
     kickoff = datetime(2026, 9, 12, 18, 30, tzinfo=timezone.utc)
-    match = Match(1, 1, "Everton", "Manchester United", "Premier League", kickoff).finish(score("1:0"))
+    finished = Match(1, 1, "Everton", "Manchester United", "Premier League", kickoff)
+    match = finished.finish(score("1:0"))
 
     with pytest.raises(DomainError):
         match.with_kickoff(kickoff + timedelta(days=1))

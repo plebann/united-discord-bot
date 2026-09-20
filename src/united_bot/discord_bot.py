@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import logging
 import os
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 import discord
@@ -62,7 +62,9 @@ def parse_kickoff(value: str) -> datetime:
     try:
         parsed = datetime.strptime(value.strip(), "%Y-%m-%d %H:%M")
     except ValueError as exc:
-        raise DomainError("Kickoff musi mieć format RRRR-MM-DD GG:MM, np. 2026-09-12 18:30.") from exc
+        raise DomainError(
+            "Kickoff musi mieć format RRRR-MM-DD GG:MM, np. 2026-09-12 18:30."
+        ) from exc
     return parsed.replace(tzinfo=LOCAL_TIMEZONE).astimezone(timezone.utc)
 
 

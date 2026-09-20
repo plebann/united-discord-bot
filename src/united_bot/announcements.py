@@ -6,7 +6,6 @@ from typing import Protocol
 from .db import AnnouncementRepository, MatchRepository
 from .domain import Match, Prediction, utc_now
 
-
 MATCH_CONFIGURED = "MATCH_CONFIGURED"
 PREDICTION_OPENED = "PREDICTION_OPENED"
 MATCH_STARTED = "MATCH_STARTED"

@@ -106,7 +106,7 @@ async def test_prediction_reports_expired_window_after_kickoff(
     service: TyperService,
 ) -> None:
     kickoff = datetime(2030, 1, 1, tzinfo=timezone.utc)
-    match = await service.add_match(
+    await service.add_match(
         1,
         "Everton",
         "Manchester United",
@@ -114,7 +114,8 @@ async def test_prediction_reports_expired_window_after_kickoff(
         kickoff,
     )
 
-    with pytest.raises(DomainError, match="Czas typowania dla meczu Everton - Manchester United minął."):
+    error_message = "Czas typowania dla meczu Everton - Manchester United minął."
+    with pytest.raises(DomainError, match=error_message):
         await service.save_prediction(
             1,
             42,
