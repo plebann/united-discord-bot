@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from .db import MatchRepository, PredictionRepository
-from .domain import DomainError, Match, Prediction, Score, utc_now
+from .domain import DomainError, Match, Prediction, Score, ensure_kickoff_in_future, utc_now
 
 
 class TyperService:
@@ -22,9 +22,12 @@ class TyperService:
         away_team: str,
         competition: str,
         kickoff_at: datetime,
+        now: datetime | None = None,
     ) -> Match:
+        current_time = now or utc_now()
         if "manchester united" not in {home_team.strip().lower(), away_team.strip().lower()}:
             raise DomainError("Mecz musi obejmować Manchester United.")
+        ensure_kickoff_in_future(kickoff_at, current_time)
         return await self.matches.add(
             Match(
                 id=None,
@@ -40,7 +43,12 @@ class TyperService:
         self,
         guild_id: int,
         kickoff_at: datetime,
+        now: datetime | None = None,
     ) -> tuple[Match, Match]:
+        current_time = now or utc_now()
+        ensure_kickoff_in_future(
+            kickoff_at, current_time, message="Nowy kickoff musi być w przyszłości."
+        )
         match = await self.matches.get_next_scheduled(guild_id)
         if match is None:
             raise LookupError("Nie znaleziono nierozliczonego meczu.")

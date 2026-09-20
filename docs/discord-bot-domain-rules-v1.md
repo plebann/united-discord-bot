@@ -2,8 +2,8 @@
 
 ## Status
 
-- Wersja: 1.0
-- Zakres: punktacja typowania oraz definicja czasu gry zawodników
+- Wersja: 1.1
+- Zakres: punktacja typowania, walidacja terminu meczu oraz definicja czasu gry zawodników
 - Cel: jednoznaczna podstawa do implementacji i testów domenowych
 
 ## 1. Słownik pojęć
@@ -193,7 +193,39 @@ def calculate_prediction_points(
 
 Implementacja produkcyjna powinna korzystać z obiektu konfiguracyjnego punktacji sezonu zamiast stałych `5`, `2` i `1`.
 
-## 4. Przypadki wymagające późniejszej decyzji
+## 4. Walidacja terminu meczu (kickoff)
+
+### Reguła — kickoff musi być w przyszłości
+
+Przy dodawaniu meczu (`/admin-mecz-dodaj`) oraz przy zmianie terminu meczu
+(`/admin-mecz-edytuj`) podany kickoff musi leżeć **ściśle w przyszłości**
+względem bieżącego czasu:
+
+```text
+kickoff > now
+```
+
+Kickoff równy bieżącemu czasowi jest odrzucany.
+
+Warunek jest sprawdzany przed zapisem meczu lub jego edycją przez funkcję domeny
+`ensure_kickoff_in_future` wywoływaną z serwisu aplikacji.
+Odrzucona operacja kończy się błędem domenowym; interfejs użytkownika wyświetla
+oddzielne komunikaty dla każdej komendy:
+
+```text
+/admin-mecz-dodaj  → „Kickoff musi być w przyszłości."
+/admin-mecz-edytuj → „Nowy kickoff musi być w przyszłości."
+```
+
+### Testy domenowe
+
+```text
+kickoff = now - 1 min   → odrzucone
+kickoff = now           → odrzucone
+kickoff = now + 1 min   → przyjęte
+```
+
+## 5. Przypadki wymagające późniejszej decyzji
 
 Przed wdrożeniem rozliczania automatycznego trzeba zdefiniować zasady dla:
 
@@ -208,7 +240,7 @@ Przed wdrożeniem rozliczania automatycznego trzeba zdefiniować zasady dla:
 
 Domyślna bezpieczna zasada: bot nie rozlicza typu, jeśli nie ma potwierdzonego wyniku regulaminowego o odpowiedniej jakości danych.
 
-## 5. Definicja czasu gry zawodnika
+## 6. Definicja czasu gry zawodnika
 
 ### Zakres czasu
 
@@ -276,7 +308,7 @@ zawodnik wchodzący: start_minute = X
 
 Nie dodajemy ani nie odejmujemy jednej minuty. Model traktuje czas jako ciągły, nie jako liczbę dyskretnych minut zegarowych.
 
-## 6. Przykłady czasu gry
+## 7. Przykłady czasu gry
 
 | Sytuacja | Początek | Koniec | Czas gry |
 |---|---:|---:|---:|
@@ -287,7 +319,7 @@ Nie dodajemy ani nie odejmujemy jednej minuty. Model traktuje czas jako ciągły
 | Wyjściowy skład, zejście w 63. minucie | 0 | 63 | 63 min |
 | Wyjściowy skład, zejście w 45+2 | 0 | 47 | 47 min |
 
-## 7. Kwalifikacja do ocen
+## 8. Kwalifikacja do ocen
 
 Na obecnym etapie obowiązuje reguła:
 
