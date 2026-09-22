@@ -196,6 +196,24 @@ class TyperCog(commands.Cog):
         except (DomainError, LookupError, RuntimeError, discord.DiscordException) as exc:
             await _send_command_error(interaction, exc)
 
+    @app_commands.command(name="admin-mecze-lista")
+    @app_commands.check(configured_channel_check)
+    async def list_matches(self, interaction: discord.Interaction) -> None:
+        if not await self._require_admin(interaction):
+            return
+        try:
+            await interaction.response.defer(ephemeral=True)
+            matches = await self.service.list_matches(interaction.guild_id or 0)
+            for chunk in _split_messages(format_match_listing(matches)):
+                await interaction.followup.send(chunk, ephemeral=True)
+            logger.info(
+                "Wylistowano %d meczów na guildzie %s",
+                len(matches),
+                interaction.guild_id,
+            )
+        except (DomainError, LookupError, RuntimeError, discord.DiscordException) as exc:
+            await _send_command_error(interaction, exc)
+
     async def _require_admin(self, interaction: discord.Interaction) -> bool:
         if interaction.guild is None:
             await interaction.response.send_message(
@@ -343,6 +361,29 @@ def format_all_predictions(match: Match, predictions: list[Prediction], now: dat
             f"typowanie zamknięte.\n{message}"
         )
     return message
+
+
+def format_match_listing(matches: list[Match]) -> str:
+    if not matches:
+        return "Brak meczów w bazie."
+    lines = []
+    for match in matches:
+        lines.append(f"#{match.id} · {_describe_match(match)}")
+    return "\n".join(lines)
+
+
+def _describe_match(match: Match) -> str:
+    is_home = match.home_team == "Manchester United"
+    opponent = match.away_team if is_home else match.home_team
+    orientation = "DOM" if is_home else "WYJAZD"
+    score_text = "-"
+    if match.final_score is not None:
+        if is_home:
+            score_text = f"{match.final_score.home}:{match.final_score.away}"
+        else:
+            score_text = f"{match.final_score.away}:{match.final_score.home}"
+    kickoff_text = match.kickoff_at.astimezone(LOCAL_TIMEZONE).strftime("%d.%m.%Y %H:%M")
+    return f"{opponent} · {score_text} · {orientation} · {match.competition} · {kickoff_text}"
 
 
 async def create_bot(

@@ -2,8 +2,8 @@
 
 ## Status
 
-- Wersja: 1.2
-- Zakres: punktacja typowania, walidacja terminu meczu, ograniczenie liczby nierozliczonych meczów oraz definicja czasu gry zawodników
+- Wersja: 1.3
+- Zakres: punktacja typowania, walidacja terminu meczu, ograniczenie liczby nierozliczonych meczów, definicja czasu gry zawodników oraz prezentacja listy meczów
 - Cel: jednoznaczna podstawa do implementacji i testów domenowych
 
 ## 1. Słownik pojęć
@@ -456,6 +456,56 @@ prezentowany jest typujący:
 
 Przy zerze typów miejsce listy zajmuje linia:
 `Nikt jeszcze nie typował na mecz {gospodarze} - {goście}.`
+
+## Prezentacja listy meczów
+
+Komenda `/admin-mecze-lista` (tylko administrator, odpowiedź prywatna) wylicza
+**wszystkie mecze bieżącej gildii** — zarówno rozliczone, jak i nierozliczone —
+w jednej liście.
+
+### Zakres i kolejność
+
+- Zakres: cała historia meczów danej gildii; nie ma parametru ograniczającego
+  liczbę wierszy ani filtra po statusie.
+- Kolejność: **najnowszy kickoff najpierw** (`kickoff_at` malejąco).
+
+### Format wiersza
+
+Każdy mecz prezentowany jest jako jedna linia z kolumnami oddzielonymi ` · `
+(w tej kolejności):
+
+```text
+#id · przeciwnik · wynik · dom/wyjazd · rozgrywki · kickoff
+```
+
+| Kolumna | Zawartość |
+|---|---|
+| `#id` | identyfikator meczu w bazie, np. `#7` |
+| `przeciwnik` | drużyna inna niż Manchester United |
+| `wynik` | wynik z perspektywy MU (bramki MU jako pierwsze); `-`, gdy mecz nierozliczony |
+| `dom/wyjazd` | `DOM`, gdy MU u siebie; `WYJAZD`, gdy MU na wyjeździe |
+| `rozgrywki` | nazwa rozgrywek |
+| `kickoff` | termin w strefie `Europe/Warsaw`, format `DD.MM.RRRR GG:MM` |
+
+Przykład:
+
+```text
+#7 · Chelsea · - · WYJAZD · Premier League · 25.05.2026 19:00
+#6 · Liverpool · 3:0 · DOM · FA Cup · 12.05.2026 19:00
+#5 · Everton · 1:2 · WYJAZD · Premier League · 05.05.2026 18:30
+```
+
+### Konwencje
+
+- Kolumny `przeciwnik`, `wynik` i `dom/wyjazd` są zawsze orientowane na
+  Manchester United (patrz słownik pojęć). W meczu wyjazdowym MU wynik jest
+  przewrócony względem zapisu `gospodarze:goście`.
+- Mecz bez wprowadzonego wyniku pokazuje `-` w kolumnie wyniku; nie ma osobnego
+  oznaczenia statusu — historia jest czytelna z dat i wyników.
+- Gdy gildia nie ma żadnych meczów, komenda odpowiada: `Brak meczów w bazie.`
+- Lista jest łamana na kolejne wiadomości po liniach, gdy przekroczy limit
+  długości wiadomości Discorda (jedna linia = jeden mecz, nigdy nie jest
+  dzielona w środku).
 
 ## 8. Testy domenowe
 

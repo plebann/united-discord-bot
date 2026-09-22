@@ -160,6 +160,17 @@ class MatchRepository:
             )
             return self._to_domain(row) if row else None
 
+    async def list_all(self, guild_id: int) -> list[Match]:
+        async with self._session_factory() as session:
+            rows = (
+                await session.scalars(
+                    select(MatchRow)
+                    .where(MatchRow.guild_id == guild_id)
+                    .order_by(MatchRow.kickoff_at.desc())
+                )
+            ).all()
+            return [self._to_domain(row) for row in rows]
+
     async def list_prediction_open_due(self, now: datetime) -> list[Match]:
         async with self._session_factory() as session:
             rows = (

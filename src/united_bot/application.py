@@ -121,6 +121,9 @@ class TyperService:
         predictions = await self.predictions.list_for_match(match.id)
         return match, sort_predictions_for_listing(predictions)
 
+    async def list_matches(self, guild_id: int) -> list[Match]:
+        return await self.matches.list_all(guild_id)
+
     async def finish_match(
         self,
         guild_id: int,
