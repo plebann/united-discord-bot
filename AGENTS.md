@@ -24,6 +24,10 @@ Layered composition; dependencies point inward only
 - `src/united_bot/domain.py` — pure domain: frozen dataclasses (`Match`, `Prediction`,
   `Score`), enums, `calculate_prediction_points`, `DomainError`. No I/O, no
   discord, no SQLAlchemy. New business rules go here first.
+- `src/united_bot/rules.py` — operational business rules as pure functions over the
+  domain values (`ensure_man_utd_involvement`, `ensure_kickoff_in_future`,
+  `ensure_no_other_unresolved`, `ensure_deletable`). Each raises `DomainError` with
+  a Polish message; no I/O, no repositories. Called from the application service.
 - `src/united_bot/application.py` — use cases (`TyperService`). Orchestrates
   repositories and the domain; owns cross-cutting flow (e.g. which match is
   "current"). No Discord types.
@@ -99,17 +103,12 @@ Do not delete or rewrite settled behaviours while adding new ones; extend the
 frozen dataclasses via new methods (`with_*`, `finish` style) rather than mutating
 state.
 
-## Business rule placement — deliberate, with an escape hatch
+## Business rule placement — single home for operational rules
 
-Business rules currently live where they were born: `ensure_kickoff_in_future` in
-`domain.py`, the Manchester United check inside `TyperService.add_match`. There is
-no dedicated rules module, and that is a **conscious decision**, not an oversight:
-with only two such rules, a separate module would be structure without leverage.
-
-If the next business rule arrives, do not add it beside the others — restructure
-first: create a single home for operational rules (a `rules` module or equivalent)
-and move the existing rules into it as part of the same change. Until then, treat
-the current placement as intentional; do not "tidy" it prematurely.
+Operational business rules live together in `src/united_bot/rules.py` as pure
+functions over domain values, called from the application service. This module
+is the established home for any new operational rule: add it there (raise
+`DomainError` with a Polish message), not beside the call site.
 
 ## Discord API discipline
 

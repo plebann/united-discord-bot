@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, event, select
+from sqlalchemy import DateTime, ForeignKey, Integer, String, delete, event, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -213,6 +213,20 @@ class MatchRepository:
             row.final_away_score = match.final_score.away if match.final_score else None
             await session.commit()
             return self._to_domain(row)
+
+    async def delete(self, match_id: int, guild_id: int) -> Match:
+        async with self._session_factory() as session:
+            row = await session.get(MatchRow, match_id)
+            if row is None or row.guild_id != guild_id:
+                raise LookupError("Nie znaleziono meczu.")
+            domain = self._to_domain(row)
+            await session.execute(delete(PredictionRow).where(PredictionRow.match_id == match_id))
+            await session.execute(
+                delete(AnnouncementRow).where(AnnouncementRow.match_id == match_id)
+            )
+            await session.delete(row)
+            await session.commit()
+            return domain
 
     @staticmethod
     def _to_domain(row: MatchRow) -> Match:

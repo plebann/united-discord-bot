@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from .domain import DomainError, Match
+from .domain import DomainError, Match, MatchStatus
+
+
+def ensure_deletable(match: Match) -> None:
+    if match.status is not MatchStatus.SCHEDULED:
+        raise DomainError("Nie można usunąć rozliczonego meczu.")
 
 
 def ensure_man_utd_involvement(home_team: str, away_team: str) -> None:

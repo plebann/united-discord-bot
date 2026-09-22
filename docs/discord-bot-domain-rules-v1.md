@@ -2,8 +2,8 @@
 
 ## Status
 
-- Wersja: 1.3
-- Zakres: punktacja typowania, walidacja terminu meczu, ograniczenie liczby nierozliczonych meczów, definicja czasu gry zawodników oraz prezentacja listy meczów
+- Wersja: 1.4
+- Zakres: punktacja typowania, walidacja terminu meczu, ograniczenie liczby nierozliczonych meczów, usuwanie meczów, definicja czasu gry zawodników oraz prezentacja listy meczów
 - Cel: jednoznaczna podstawa do implementacji i testów domenowych
 
 ## 1. Słownik pojęć
@@ -246,9 +246,40 @@ Kolejność walidacji przy dodawaniu: 1) udział Manchester United,
 2) kickoff w przyszłości, 3) brak innego nierozliczonego meczu.
 
 Naprawa stanu z kilkoma nierozliczonymi meczami: rozpoczęte mecze rozlicza
-`/admin-mecz-wynik`, a mecze o terminie w przyszłości usuwa administrator ręcznie
-w bazie SQLite. Dodawanie pozostaje zablokowane, dopóki stan nie zostanie
-naprawiony do jednego nierozliczonego meczu lub ich braku.
+`/admin-mecz-wynik`, a pozostałe usuwa administrator przez `/admin-mecz-usun`
+(id widoczne w `/admin-mecze-lista`). Dodawanie pozostaje zablokowane, dopóki
+stan nie zostanie naprawiony do jednego nierozliczonego meczu lub ich braku.
+
+## Usunięcie meczu
+
+### Reguła — usuwalny jest tylko nierozliczony mecz
+
+Mecz może zostać usunięty komendą `/admin-mecz-usun id` wyłącznie wtedy, gdy
+`status == SCHEDULED` — niezależnie od tego, czy jego kickoff już nastąpił
+(mecz rozpoczęty, ale nierozliczony, można usunąć). Rozliczony mecz
+(`FINISHED`) jest chroniony: jego wynik i przyznane punkty nie mogą zostać
+skasowane. Reguła jest realizowana przez funkcję `ensure_deletable` w module
+reguł operacyjnych, wywoływaną z serwisu aplikacji.
+
+### Kaskada i atomowość
+
+Usunięcie meczu usuwa w jednej transakcji wiersz meczu wraz z wierszami
+zależnymi: typy tego meczu (przy meczu nierozliczonym — niepunktowane) oraz
+wiersze ogłoszeń tego meczu. Częściowe usunięcie jest niemożliwe — albo znika
+całe drzewo wierszy zależnych razem z meczem, albo nic. Dzięki temu po usunięciu
+reguła „co najwyżej jeden nierozliczony mecz" znów pozwala dodać poprawny mecz,
+a ponowna konfiguracja może opublikować ogłoszenia od nowa.
+
+### Komunikaty komendy
+
+Odpowiedź komendy jest wyłącznie prywatna (ephemeral); usunięcie nie jest
+ogłaszane publicznie w kanale:
+
+```text
+sukces          → „Usunięto mecz #<id>."
+brak meczu      → „Nie znaleziono meczu o identyfikatorze #<id>."
+mecz rozliczony → „Nie można usunąć rozliczonego meczu."
+```
 
 ## 5. Przypadki wymagające późniejszej decyzji
 

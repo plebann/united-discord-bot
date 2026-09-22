@@ -11,7 +11,12 @@ from .domain import (
     sort_predictions_for_listing,
     utc_now,
 )
-from .rules import ensure_kickoff_in_future, ensure_man_utd_involvement, ensure_no_other_unresolved
+from .rules import (
+    ensure_deletable,
+    ensure_kickoff_in_future,
+    ensure_man_utd_involvement,
+    ensure_no_other_unresolved,
+)
 
 
 class TyperService:
@@ -123,6 +128,13 @@ class TyperService:
 
     async def list_matches(self, guild_id: int) -> list[Match]:
         return await self.matches.list_all(guild_id)
+
+    async def delete_match(self, guild_id: int, match_id: int) -> Match:
+        match = await self.matches.get(match_id, guild_id)
+        if match is None:
+            raise LookupError(f"Nie znaleziono meczu o identyfikatorze #{match_id}.")
+        ensure_deletable(match)
+        return await self.matches.delete(match_id, guild_id)
 
     async def finish_match(
         self,

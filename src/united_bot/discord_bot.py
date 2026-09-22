@@ -214,6 +214,20 @@ class TyperCog(commands.Cog):
         except (DomainError, LookupError, RuntimeError, discord.DiscordException) as exc:
             await _send_command_error(interaction, exc)
 
+    @app_commands.command(name="admin-mecz-usun")
+    @app_commands.check(configured_channel_check)
+    @app_commands.describe(id="Identyfikator meczu (#id) widoczny w /admin-mecze-lista")
+    async def delete_match(self, interaction: discord.Interaction, id: int) -> None:
+        if not await self._require_admin(interaction):
+            return
+        try:
+            await interaction.response.defer(ephemeral=True)
+            deleted = await self.service.delete_match(interaction.guild_id or 0, id)
+            await interaction.followup.send(f"Usunięto mecz #{deleted.id}.", ephemeral=True)
+            logger.info("Usunięto mecz #%s na guildzie %s", deleted.id, interaction.guild_id)
+        except (DomainError, LookupError, RuntimeError, discord.DiscordException) as exc:
+            await _send_command_error(interaction, exc)
+
     async def _require_admin(self, interaction: discord.Interaction) -> bool:
         if interaction.guild is None:
             await interaction.response.send_message(
