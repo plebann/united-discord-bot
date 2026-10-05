@@ -135,6 +135,25 @@ async def test_var_role_invalid_value_keeps_original_gate(
 
 
 @pytest.mark.asyncio
+async def test_var_role_unicode_digit_value_keeps_original_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # "²".isdigit() is True but int("²") raises ValueError — must fall back to
+    # the permission-only gate instead of propagating the parse error.
+    monkeypatch.setenv("VAR_ROLE_ID", "²")
+    response = Response()
+    interaction = SimpleNamespace(
+        guild=object(),
+        permissions=discord.Permissions.none(),
+        user=SimpleNamespace(id=7, roles=[]),
+        response=response,
+    )
+
+    assert await TyperCog(object(), object())._require_admin(interaction) is False
+    assert response.messages == ["Ta komenda wymaga uprawnienia Manage Guild lub Administrator."]
+
+
+@pytest.mark.asyncio
 async def test_list_matches_sends_listing_chunks_for_admin() -> None:
     followup = Followup()
     response = Response()

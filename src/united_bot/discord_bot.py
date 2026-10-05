@@ -243,11 +243,18 @@ class TyperCog(commands.Cog):
 
 
 def var_role_id() -> int | None:
-    """Czytelna wartość VAR_ROLE_ID z env; None, gdy nie skonfigurowano roli."""
+    """Czytelna wartość VAR_ROLE_ID z env; None, gdy nie skonfigurowano roli.
+
+    `str.isdigit()` akceptuje cyfry nie-ASCII (np. superskrypty), których `int()`
+    nie zparsuje, więc konwersja idzie przez `try/except`: nieudany parse
+    traktujemy tak samo jak brak konfiguracji, zamiast rzucać `ValueError`.
+    """
     configured = os.getenv("VAR_ROLE_ID", "").strip()
-    if configured.isdigit() and int(configured) > 0:
-        return int(configured)
-    return None
+    try:
+        role_id = int(configured)
+    except ValueError:
+        return None
+    return role_id if role_id > 0 else None
 
 
 def has_var_role(interaction: discord.Interaction) -> bool:
