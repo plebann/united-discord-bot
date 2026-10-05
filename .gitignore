@@ -52,6 +52,20 @@ coverage.xml
 .test_scratch/
 cover/
 
+# pytest / ruff temp dirs and scratch (random suffixes from test runs)
+.pybt-*/
+.pytest_t_*/
+.pytest_tmp*
+.pytest-*/
+pytest-*/
+bt_*/
+.tb/
+.zz_abs/
+.tmp/
+.tmp-*/
+tmp-work/
+utest-run/
+
 # Translations
 *.mo
 *.pot
