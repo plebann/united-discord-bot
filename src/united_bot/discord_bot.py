@@ -236,13 +236,42 @@ class TyperCog(commands.Cog):
             )
             return False
         permissions = interaction.permissions
-        if not (permissions.manage_guild or permissions.administrator):
-            await interaction.response.send_message(
-                "Ta komenda wymaga uprawnienia Manage Guild lub Administrator.",
-                ephemeral=True,
-            )
-            return False
-        return True
+        if permissions.manage_guild or permissions.administrator or has_var_role(interaction):
+            return True
+        await interaction.response.send_message(_admin_denial_message(), ephemeral=True)
+        return False
+
+
+def var_role_id() -> int | None:
+    """Czytelna wartość VAR_ROLE_ID z env; None, gdy nie skonfigurowano roli.
+
+    `str.isdigit()` akceptuje cyfry nie-ASCII (np. superskrypty), których `int()`
+    nie zparsuje, więc konwersja idzie przez `try/except`: nieudany parse
+    traktujemy tak samo jak brak konfiguracji, zamiast rzucać `ValueError`.
+    """
+    configured = os.getenv("VAR_ROLE_ID", "").strip()
+    try:
+        role_id = int(configured)
+    except ValueError:
+        return None
+    return role_id if role_id > 0 else None
+
+
+def has_var_role(interaction: discord.Interaction) -> bool:
+    """Czy wywołujący ma przypisaną rolę VAR (skonfigurowaną w VAR_ROLE_ID)."""
+    role_id = var_role_id()
+    if role_id is None:
+        return False
+    roles = getattr(interaction.user, "roles", None)
+    if roles is None:
+        return False
+    return any(getattr(role, "id", None) == role_id for role in roles)
+
+
+def _admin_denial_message() -> str:
+    if var_role_id() is not None:
+        return "Ta komenda wymaga uprawnienia Manage Guild, Administrator lub roli VAR."
+    return "Ta komenda wymaga uprawnienia Manage Guild lub Administrator."
 
 
 class UserTyperCog(commands.Cog):

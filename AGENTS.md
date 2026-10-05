@@ -57,9 +57,11 @@ Layered composition; dependencies point inward only
 - The adapter layer maps exceptions to ephemeral user messages
   (`_send_command_error`, per-command `except` blocks); domain errors must never
   leak as stack traces into Discord.
-- Admin commands check `manage_guild` or `administrator` via `_require_admin`;
-  every command is additionally restricted to `CHANNEL_ID` by
-  `configured_channel_check`. Keep both when adding admin commands.
+- Admin commands check `manage_guild`, `administrator`, or membership in the
+  configured `VAR_ROLE_ID` role via `_require_admin`; every command is
+  additionally restricted to `CHANNEL_ID` by `configured_channel_check`. Keep
+  both when adding admin commands. The VAR gate is opt-in: an empty
+  `VAR_ROLE_ID` leaves only the permission-based check active.
 - User-facing text is Polish; identifiers are English.
 - Style is enforced by ruff (`E`, `F`, `I`, line length 100) configured in
   `pyproject.toml`: run `ruff check .` (and `ruff format` when touching a file)

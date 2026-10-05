@@ -18,11 +18,17 @@ Komendy:
 - `/admin-mecz-edytuj kickoff:<data>`
 - `/admin-mecz-wynik wynik:<gospodarze>:<goście>`
 
-Komendy administracyjne wymagają uprawnienia `Manage Guild` albo `Administrator`.
+Komendy administracyjne wymagają uprawnienia `Manage Guild`, `Administrator`
+albo członkostwa w roli `VAR` (gdy skonfigurowano `VAR_ROLE_ID` w `.env`).
 Kickoff należy podawać jako czas Polski w formacie `RRRR-MM-DD GG:MM`, np.
 `2026-09-12 18:30`. Bot konwertuje tę wartość do UTC w bazie.
 Wszystkie slash commands działają wyłącznie na kanale wskazanym przez
 `CHANNEL_ID` w pliku `.env`.
+
+`VAR_ROLE_ID` jest opcjonalny: gdy pusty, rola nie ma żadnego efektu i obowiązuje
+klasyczna bramka (`Manage Guild` / `Administrator`). Ustaw identyfikator roli VAR
+(Discord: Ustawienia → Zaawansowane → Tryb dewelopera, potem PPM na rolę →
+Kopiuj identyfikator roli), aby członkowie tej roli zyskali dostęp do `/admin-*`.
 Bot publikuje tam również ogłoszenia o konfiguracji meczu, rozpoczęciu
 typowania, zmianie kickoffu i zakończeniu rozliczenia. Ogłoszenia o otwarciu
 typowania są sprawdzane co 5 minut.
