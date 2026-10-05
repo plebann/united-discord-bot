@@ -238,6 +238,14 @@ class TyperCog(commands.Cog):
         permissions = interaction.permissions
         if permissions.manage_guild or permissions.administrator or has_var_role(interaction):
             return True
+        user_roles = getattr(interaction.user, "roles", None)
+        logger.warning(
+            "Odmowa dostępu do komendy admin dla użytkownika %s (%s): role=%s, VAR=%s",
+            interaction.user.id,
+            type(interaction.user).__name__,
+            [getattr(role, "id", None) for role in user_roles] if user_roles is not None else None,
+            var_role_id(),
+        )
         await interaction.response.send_message(_admin_denial_message(), ephemeral=True)
         return False
 
