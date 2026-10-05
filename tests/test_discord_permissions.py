@@ -181,6 +181,7 @@ async def test_list_matches_denied_for_non_admin() -> None:
         guild=object(),
         guild_id=42,
         permissions=discord.Permissions.none(),
+        user=SimpleNamespace(id=7, roles=[SimpleNamespace(id=999)]),
         response=response,
         followup=followup,
     )
