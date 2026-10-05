@@ -23,3 +23,10 @@ _Avoid_: wynik „gospodarze:goście"
 Mecz bez wprowadzonego wyniku; pozostały termin można zmieniać, a po
 rozpoczęciu mecz należy rozliczyć wynikiem regulaminowym.
 _Avoid_: otwarty mecz, aktywny mecz
+
+**Aktywny mecz do typowania**:
+Mecz, na który dziś przypada typowanie: trwający nierozliczony mecz ma
+pierwszeństwo nad przyszłym z otwartym oknem; inaczej mecz z otwartym oknem
+typowania; gdy żaden warunek nie zachodzi — taki mecz nie istnieje.
+Nie jest synonimem pojęcia „Nierozliczony mecz".
+_Avoid_: docelowy mecz, bieżący mecz, otwarty mecz
