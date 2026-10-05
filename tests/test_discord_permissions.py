@@ -62,6 +62,79 @@ async def test_manage_server_permission_from_interaction_is_accepted() -> None:
 
 
 @pytest.mark.asyncio
+async def test_var_role_membership_is_accepted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("VAR_ROLE_ID", "123")
+    response = Response()
+    interaction = SimpleNamespace(
+        guild=object(),
+        permissions=discord.Permissions.none(),
+        user=SimpleNamespace(
+            id=7,
+            roles=[SimpleNamespace(id=123), SimpleNamespace(id=456)],
+        ),
+        response=response,
+    )
+
+    assert await TyperCog(object(), object())._require_admin(interaction) is True
+    assert response.messages == []
+
+
+@pytest.mark.asyncio
+async def test_var_role_id_mismatch_denies_plain_member(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("VAR_ROLE_ID", "123")
+    response = Response()
+    interaction = SimpleNamespace(
+        guild=object(),
+        permissions=discord.Permissions.none(),
+        user=SimpleNamespace(id=7, roles=[SimpleNamespace(id=999)]),
+        response=response,
+    )
+
+    assert await TyperCog(object(), object())._require_admin(interaction) is False
+    assert response.messages == [
+        "Ta komenda wymaga uprawnienia Manage Guild, Administrator lub roli VAR."
+    ]
+
+
+@pytest.mark.asyncio
+async def test_var_role_not_configured_keeps_original_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("VAR_ROLE_ID", raising=False)
+    response = Response()
+    interaction = SimpleNamespace(
+        guild=object(),
+        permissions=discord.Permissions.none(),
+        user=SimpleNamespace(id=7, roles=[]),
+        response=response,
+    )
+
+    assert await TyperCog(object(), object())._require_admin(interaction) is False
+    assert response.messages == ["Ta komenda wymaga uprawnienia Manage Guild lub Administrator."]
+
+
+@pytest.mark.asyncio
+async def test_var_role_invalid_value_keeps_original_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("VAR_ROLE_ID", "abc")
+    response = Response()
+    interaction = SimpleNamespace(
+        guild=object(),
+        permissions=discord.Permissions.none(),
+        user=SimpleNamespace(id=7, roles=[]),
+        response=response,
+    )
+
+    assert await TyperCog(object(), object())._require_admin(interaction) is False
+    assert response.messages == ["Ta komenda wymaga uprawnienia Manage Guild lub Administrator."]
+
+
+@pytest.mark.asyncio
 async def test_list_matches_sends_listing_chunks_for_admin() -> None:
     followup = Followup()
     response = Response()
