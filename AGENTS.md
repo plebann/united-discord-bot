@@ -130,9 +130,14 @@ Facts about the platform that are easy to get wrong (see
   own retry loops or sleep-based backoff around `channel.send` / API calls.
 - Slash commands are per-guild state on Discord: sync once at startup (the
   `setup_hook` does this). Do not call `tree.sync()` from handlers or on a loop.
-- Keep intents minimal; the bot runs with `Intents.none()`. Any new privileged
-  intent is a deliberate, documented decision (and requires review in the
-  Developer Portal).
+- Keep intents minimal; the bot runs with `discord.Intents(guilds=True)` only —
+  no privileged intents. `guilds` is required, not optional: without
+  `GUILD_CREATE` the guild never reaches discord.py's cache, interaction
+  members resolve roles through an empty "unavailable guild" stub
+  (`member.roles == []`), and the `VAR_ROLE_ID` gate in `_require_admin`
+  can never match. Do not "simplify" this back to `Intents.none()`.
+  Any new privileged intent is a deliberate, documented decision (and requires
+  review in the Developer Portal).
 - Long-lived scheduled work belongs in `discord.ext.tasks.loop` with a
   `before_loop` that waits for readiness, wrapped in try/except so one bad cycle
   cannot kill the loop (see `poll_announcements`).

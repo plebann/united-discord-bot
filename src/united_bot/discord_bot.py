@@ -238,11 +238,12 @@ class TyperCog(commands.Cog):
         permissions = interaction.permissions
         if permissions.manage_guild or permissions.administrator or has_var_role(interaction):
             return True
-        user_roles = getattr(interaction.user, "roles", None)
+        actor = getattr(interaction, "user", None)
+        user_roles = getattr(actor, "roles", None)
         logger.warning(
             "Odmowa dostępu do komendy admin dla użytkownika %s (%s): role=%s, VAR=%s",
-            interaction.user.id,
-            type(interaction.user).__name__,
+            getattr(actor, "id", None),
+            type(actor).__name__ if actor is not None else "brak usera",
             [getattr(role, "id", None) for role in user_roles] if user_roles is not None else None,
             var_role_id(),
         )
@@ -443,7 +444,10 @@ async def create_bot(
     publisher: DiscordAnnouncementPublisher,
     name_resolver: DiscordDisplayNameResolver | None = None,
 ) -> commands.Bot:
-    intents = discord.Intents.none()
+    # `guilds` (nieprzywilejowana) jest wymagana: bez GUILD_CREATE gildia nie trafia
+    # do cache'u discord.py i `member.roles` z payloadu interakcji zostaje
+    # rozwiązane przez pusty stub "unavailable guild" (role=[]), co psułoby bramkę VAR.
+    intents = discord.Intents(guilds=True)
     bot = commands.Bot(command_prefix="!", intents=intents)
     await bot.add_cog(TyperCog(service, announcements))
     await bot.add_cog(UserTyperCog(service))
