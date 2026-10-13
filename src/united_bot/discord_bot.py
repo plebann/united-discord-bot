@@ -340,6 +340,12 @@ class UserTyperCog(commands.Cog):
             )
             if result.active_match is None:
                 message = "Nie ma teraz aktywnego meczu do typowania."
+            elif result.prediction is None and result.active_match.in_progress:
+                match = result.active_match.match
+                message = (
+                    f"Nie masz typu na aktualnie trwający mecz "
+                    f"{match.home_team} - {match.away_team}."
+                )
             elif result.prediction is None:
                 message = f"Nie masz jeszcze typu dla meczu #{result.active_match.match.id}."
             else:

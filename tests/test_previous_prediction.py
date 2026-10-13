@@ -25,7 +25,7 @@ async def service(tmp_path: Path):
 
 
 @pytest.mark.asyncio
-async def test_my_prediction_returns_no_active_match_after_settlement(
+async def test_my_prediction_hides_settled_prediction_history_when_no_match_is_active(
     service: TyperService,
 ) -> None:
     kickoff = datetime(2030, 1, 1, tzinfo=timezone.utc)
@@ -36,6 +36,7 @@ async def test_my_prediction_returns_no_active_match_after_settlement(
         "Premier League",
         kickoff,
     )
+    await service.save_prediction(1, 42, Score(2, 1), kickoff - timedelta(days=1))
     await service.finish_match(1, Score(2, 0), kickoff + timedelta(hours=2))
 
     result = await service.get_prediction(1, 42, kickoff + timedelta(days=1))
