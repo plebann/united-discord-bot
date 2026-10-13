@@ -2,12 +2,14 @@
 
 ## Status
 
-- Wersja: 1.5
+- Wersja: 1.6
 - Zakres: punktacja typowania, walidacja terminu meczu, ograniczenie liczby nierozliczonych meczów, usuwanie meczów, definicja czasu gry zawodników oraz prezentacja listy meczów
 - Cel: jednoznaczna podstawa do implementacji i testów domenowych
 
 ### Changelog
 
+- **1.6** — `/moj-typ` działa wyłącznie dla Aktywnego meczu do typowania i nie
+  pokazuje historii ostatnich rozliczonych meczów.
 - **1.5** — terminologia: sekcja „Prezentacja listy typów" mapuje pojęcie
   „docelowy mecz" na ustalony termin glosariusza „Aktywny mecz do typowania"
   (patrz `CONTEXT.md`). Treść reguł pozostaje bez zmian.
@@ -184,10 +186,7 @@ def calculate_prediction_points(
         predicted_home,
         predicted_away,
     )
-    correct_one_goal_count = (
-        actual_home == predicted_home
-        or actual_away == predicted_away
-    )
+    correct_one_goal_count = actual_home == predicted_home or actual_away == predicted_away
 
     if correct_result:
         return 2 + int(correct_one_goal_count)
@@ -408,9 +407,10 @@ Do doprecyzowania w kolejnej iteracji:
 
 ## Prezentacja listy typów
 
-Komenda `/wszystkie-typy` zwraca prywatną listę wszystkich typów złożonych na
-docelowy mecz (termin glosariusza: „Aktywny mecz do typowania"), ustalany w tej
-kolejności:
+Komendy `/moj-typ` i `/wszystkie-typy` działają wyłącznie dla
+**Aktywnego meczu do typowania**. `/moj-typ` nie pokazuje historii ostatnich
+rozliczonych meczów. Komenda `/wszystkie-typy` zwraca prywatną listę wszystkich
+typów złożonych na Aktywny mecz do typowania, ustalany w tej kolejności:
 
 1. **Mecz trwający** (rozpoczęty, nierozliczony) — ma pierwszeństwo nawet nad
    przyszłym meczem, którego okno typowania jest już otwarte;

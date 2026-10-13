@@ -71,8 +71,9 @@ bo defer idzie przed I/O). Zmiana jest w budowie kodu:
    „nie masz jeszcze typu dla meczu #id" było poprawne bez zegara w adapterze.
 5. Jako developer, chcę, by adapter `/moj-typ` przestał wołać `datetime.now(...)`
    bezpośrednio, aby konwencja pinned-now obowiązywała wszędzie.
-6. Jako developer, chcę, by `get_prediction` zwracało `MyPrediction`
-   (match/prediction/in_progress), aby handler gałęziował na jednym obiekcie.
+6. Jako developer, chcę, by `get_prediction` zwracało `ActivePrediction`
+   (active_match/prediction), aby handler gałęziował na jednym obiekcie i nie
+   odtwarzał polityki Aktywnego meczu do typowania.
 7. Jako developer, chcę, by `list_predictions` zwracało `(ActiveMatch | None, lista)`,
    aby formatter `/wszystkie-typy` dostawał fazę jako wartość zamiast parametru czasu.
 8. Jako utrzymujący, chcę, by `add_match`/`edit_kickoff`/`finish_match` i
@@ -187,7 +188,7 @@ sygnatury są artefaktami decyzji i podane celowo precyzyjnie.
 ### Moduł aplikacji (T1)
 
 - Dwa nowe frozen dataclass-y obok serwisu: `ActiveMatch(match: Match, in_progress: bool)`
-  i `MyPrediction(match: Match | None, prediction: Prediction | None, in_progress: bool)`.
+  i `ActivePrediction(active_match: ActiveMatch | None, prediction: Prediction | None)`.
   Dom = aplikacja (nosiciel przypadku użycia, nie wartość domeny); promocja do domeny
   dopiero przy wielu użyciach.
 - Nowa publiczna metoda: `TyperService.active_match(guild_id, now=None) -> ActiveMatch | None`
@@ -195,17 +196,16 @@ sygnatury są artefaktami decyzji i podane celowo precyzyjnie.
   potem `get_current`) + reguła z modułu reguł + owinięcie w nosiciel.
 - `save_prediction`, `get_prediction`, `list_predictions` trafiają przez szew
   `active_match`; zwroty: `save_prediction` zostaje trzy-elementówką (match,
-  prediction, previous) ale mecz pochodzi z szewa; `get_prediction` → `MyPrediction`;
+  prediction, previous) ale mecz pochodzi z szewa; `get_prediction` → `ActivePrediction`;
   `list_predictions` → `(ActiveMatch | None, list[Prediction])`, przypadek pusty
   `(None, [])`.
-- Zmiana semantyczna (W1, przycięta): w stanie legacy dwóch nierozliczonych meczów
-  `/typ` trafia w trwający zamiast przyszłego i zgłasza minione okno — akceptowane
-  jako konsekwencja spójnej polityki szwu; stan jest nieosiągalny normalną drogą
-  (`add_match` go blokuje), **bez dedykowanej analizy i testu**.
+- `/typ` dla wybranego trwającego meczu odrzuca zapis komunikatem o minionym oknie.
+  Inwariant najwyżej jednego nierozliczonego meczu pozostaje założeniem danych; stan
+  legacy z wieloma takimi meczami nie ma osobnej polityki ani testu.
 - `add_match`, `edit_kickoff`, `finish_match`, `delete_match`, `list_matches` i
   `get_next_scheduled` nietknięte. Fetchery `get_current`/`get_in_progress` pozostają
-  publiczne i nienaruszone — bez odchudzania redundancyjnego ponownego sprawdzenia
-  `can_predict` (defensywne, ustalone zachowanie).
+  publiczne i nienaruszone; inwariant najwyżej jednego nierozliczonego meczu jest
+  założeniem danych, bez defensywnej polityki dla legacy wielomaczowego stanu.
 
 ### Moduł prezentacji — NOWY (T2)
 
@@ -355,11 +355,10 @@ pinned `now`, asercje na wartościach/tekstach) — nie white-box wewnętrznych 
 
 - **Moduł reguł** — funkcja selektora testowana czysto, bez repozytorium i bazy
   (trzy gałęzie: trwający / otwarte okno / brak).
-- **Moduł aplikacji** — nowy plik behawioralny nazwany po zachowaniu, pinujący
-  priorytet bezpośrednio na `TyperService.active_match` z piniętym `now`; istniejące
-  pliki adaptują się mechanicznie do zmian sygnatur (rozpakowania `MyPrediction` w
-  testach poprzedniego typu, zwrot `list_predictions`). Istniejący test priorytetowy
-  (legacy dwa-nierozliczone, seed przez repo) zostaje jako kontrakt end-to-end.
+- **Moduł aplikacji** — test selektora i zachowania `TyperService.active_match` z
+  przypiętym `now`; testy `/typ`, active-only `/moj-typ` i `list_predictions` sprawdzają
+  wartości zwracane przez publiczne interfejsy. Stan legacy z wieloma nierozliczonymi
+  meczami nie jest testowany.
 - **Moduł prezentacji** — czyste funkcje z fikcjami domeny; testy szablonów ogłoszeń
   przechodzą **bez zmiany asercji** (stringi bajtowo identyczne, tokeny `<t:…>` nie
   zależą od strefy po stronie serwera); jedyne zwiększenie churnu = wywołania
@@ -382,8 +381,6 @@ pinned `now`, asercje na wartościach/tekstach) — nie white-box wewnętrznych 
   kanału → fabryka z intem; monkeypatche env w testach publishera → skalar w
   konstruktorze; konstruktory cogów dostosowane do nowej liczby argumentów;
   `parse_kickoff` testowany ze strefą jako argumentem.
-- Brak dedykowanego testu flipu semantyki `/typ` w stanie legacy (W1 przycięte:
-  nie analizujemy sytuacji nieosiągalnych normalną drogą).
 
 ## Out of Scope
 

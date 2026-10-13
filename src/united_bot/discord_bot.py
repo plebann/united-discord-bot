@@ -16,7 +16,6 @@ from .domain import (
     Match,
     Prediction,
     Score,
-    utc_now,
 )
 
 logger = logging.getLogger(__name__)
@@ -335,20 +334,17 @@ class UserTyperCog(commands.Cog):
     @app_commands.check(configured_channel_check)
     async def my_prediction(self, interaction: discord.Interaction) -> None:
         try:
-            match, prediction = await self.service.get_prediction(
+            result = await self.service.get_prediction(
                 interaction.guild_id or 0,
                 interaction.user.id,
             )
-            if match is None:
-                message = "Jeszcze nie typowałeś."
-            elif prediction is None and match.kickoff_at <= datetime.now(timezone.utc):
-                message = (
-                    f"Nie masz typu na aktualnie trwający mecz "
-                    f"{match.home_team} - {match.away_team}."
-                )
-            elif prediction is None:
-                message = f"Nie masz jeszcze typu dla meczu #{match.id}."
+            if result.active_match is None:
+                message = "Nie ma teraz aktywnego meczu do typowania."
+            elif result.prediction is None:
+                message = f"Nie masz jeszcze typu dla meczu #{result.active_match.match.id}."
             else:
+                match = result.active_match.match
+                prediction = result.prediction
                 points = (
                     f"{prediction.points} pkt" if prediction.points is not None else "nierozliczony"
                 )
@@ -373,20 +369,22 @@ class UserTyperCog(commands.Cog):
     async def all_predictions(self, interaction: discord.Interaction) -> None:
         try:
             await interaction.response.defer(ephemeral=True)
-            match, predictions = await self.service.list_predictions(interaction.guild_id or 0)
-            if match is None:
+            active, predictions = await self.service.list_predictions(interaction.guild_id or 0)
+            if active is None:
                 await interaction.followup.send(
                     "Nie ma teraz aktywnego meczu do typowania.",
                     ephemeral=True,
                 )
                 return
-            chunks = _split_messages(format_all_predictions(match, predictions, utc_now()))
+            chunks = _split_messages(
+                format_all_predictions(active.match, predictions, active.in_progress)
+            )
             for chunk in chunks:
                 await interaction.followup.send(chunk, ephemeral=True)
             logger.info(
                 "Wylistowano %d typów dla meczu #%s na guildzie %s",
                 len(predictions),
-                match.id,
+                active.match.id,
                 interaction.guild_id,
             )
         except (DomainError, LookupError, RuntimeError, discord.DiscordException) as exc:
@@ -401,13 +399,17 @@ def build_prediction_listing(match: Match, predictions: list[Prediction]) -> str
     )
 
 
-def format_all_predictions(match: Match, predictions: list[Prediction], now: datetime) -> str:
+def format_all_predictions(
+    match: Match,
+    predictions: list[Prediction],
+    in_progress: bool,
+) -> str:
     message = (
         build_prediction_listing(match, predictions)
         if predictions
         else f"Nikt jeszcze nie typował na mecz {match.home_team} - {match.away_team}."
     )
-    if match.kickoff_at <= now:
+    if in_progress:
         message = (
             f"\u26bd Mecz {match.home_team} - {match.away_team} trwa — "
             f"typowanie zamknięte.\n{message}"

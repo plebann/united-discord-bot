@@ -82,7 +82,7 @@ async def test_match_started_announcement_lists_types_with_resolved_names(starte
 
     match, _ = await typer.list_predictions(1, now + timedelta(minutes=3))
     assert match is not None
-    await service.publish_match_started(match, kickoff)
+    await service.publish_match_started(match.match, kickoff)
 
     assert len(publisher.messages) == 1
     listing_lines = [
@@ -111,7 +111,7 @@ async def test_match_started_announcement_reports_no_types_and_skips_name_lookup
 
     match, _ = await typer.list_predictions(1, kickoff - timedelta(days=1))
     assert match is not None
-    await service.publish_match_started(match, kickoff)
+    await service.publish_match_started(match.match, kickoff)
 
     assert len(publisher.messages) == 1
     assert "Nikt jeszcze nie typował na mecz Everton - Manchester United." in publisher.messages[0]
@@ -129,8 +129,8 @@ async def test_match_started_announcement_is_published_once_per_match(started_en
 
     match, _ = await typer.list_predictions(1, now + timedelta(minutes=1))
     assert match is not None
-    await service.publish_match_started(match, kickoff)
-    await service.publish_match_started(match, kickoff + timedelta(minutes=5))
+    await service.publish_match_started(match.match, kickoff)
+    await service.publish_match_started(match.match, kickoff + timedelta(minutes=5))
 
     assert len(publisher.messages) == 1
     assert resolver.calls == 1
@@ -149,6 +149,6 @@ async def test_match_started_announcement_falls_back_to_mentions_without_resolve
 
     match, _ = await typer.list_predictions(1, now + timedelta(minutes=1))
     assert match is not None
-    await service.publish_match_started(match, kickoff)
+    await service.publish_match_started(match.match, kickoff)
 
     assert "1. <@101> — 2:0" in publisher.messages[0]

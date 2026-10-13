@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 
 from .db import MatchRepository, PredictionRepository
@@ -16,7 +17,20 @@ from .rules import (
     ensure_kickoff_in_future,
     ensure_man_utd_involvement,
     ensure_no_other_unresolved,
+    select_active_match,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class ActiveMatch:
+    match: Match
+    in_progress: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ActivePrediction:
+    active_match: ActiveMatch | None
+    prediction: Prediction | None
 
 
 class TyperService:
@@ -70,6 +84,21 @@ class TyperService:
             raise DomainError("Termin meczu nie został zmieniony.")
         return match, await self.matches.update(match.with_kickoff(kickoff_at))
 
+    async def active_match(
+        self,
+        guild_id: int,
+        now: datetime | None = None,
+    ) -> ActiveMatch | None:
+        current_time = now or utc_now()
+        selected = select_active_match(
+            await self.matches.get_in_progress(guild_id, current_time),
+            await self.matches.get_current(guild_id, current_time),
+        )
+        if selected is None:
+            return None
+        match, in_progress = selected
+        return ActiveMatch(match=match, in_progress=in_progress)
+
     async def save_prediction(
         self,
         guild_id: int,
@@ -78,53 +107,49 @@ class TyperService:
         now: datetime | None = None,
     ) -> tuple[Match, Prediction, Prediction | None]:
         current_time = now or utc_now()
-        match = await self.matches.get_current(guild_id, current_time)
-        if match is None:
-            in_progress = await self.matches.get_in_progress(guild_id, current_time)
-            if in_progress is not None:
-                raise DomainError(
-                    f"Czas typowania dla meczu {in_progress.home_team} - "
-                    f"{in_progress.away_team} minął."
-                )
+        active = await self.active_match(guild_id, current_time)
+        if active is None:
             raise DomainError("Nie ma teraz aktywnego meczu do typowania.")
-        previous_prediction = await self.predictions.get(match.id, user_id)
+        if active.in_progress:
+            raise DomainError(
+                f"Czas typowania dla meczu {active.match.home_team} - "
+                f"{active.match.away_team} minął."
+            )
+        previous_prediction = await self.predictions.get(active.match.id, user_id)
         prediction = await self.predictions.upsert(
-            Prediction(match_id=match.id, user_id=user_id, score=score, updated_at=current_time)
+            Prediction(
+                match_id=active.match.id,
+                user_id=user_id,
+                score=score,
+                updated_at=current_time,
+            )
         )
-        return match, prediction, previous_prediction
+        return active.match, prediction, previous_prediction
 
     async def get_prediction(
         self,
         guild_id: int,
         user_id: int,
         now: datetime | None = None,
-    ) -> tuple[Match | None, Prediction | None]:
-        current_time = now or utc_now()
-        in_progress = await self.matches.get_in_progress(guild_id, current_time)
-        if in_progress is not None:
-            return in_progress, await self.predictions.get(in_progress.id, user_id)
-        match = await self.matches.get_current(guild_id, current_time)
-        if match is not None:
-            prediction = await self.predictions.get(match.id, user_id)
-            if prediction is not None or await self.predictions.has_any_for_user(guild_id, user_id):
-                return match, prediction
-            return None, None
-        previous = await self.predictions.get_latest_for_user(guild_id, user_id)
-        return previous if previous is not None else (None, None)
+    ) -> ActivePrediction:
+        active = await self.active_match(guild_id, now)
+        if active is None:
+            return ActivePrediction(active_match=None, prediction=None)
+        return ActivePrediction(
+            active_match=active,
+            prediction=await self.predictions.get(active.match.id, user_id),
+        )
 
     async def list_predictions(
         self,
         guild_id: int,
         now: datetime | None = None,
-    ) -> tuple[Match | None, list[Prediction]]:
-        current_time = now or utc_now()
-        match = await self.matches.get_in_progress(guild_id, current_time)
-        if match is None:
-            match = await self.matches.get_current(guild_id, current_time)
-        if match is None:
+    ) -> tuple[ActiveMatch | None, list[Prediction]]:
+        active = await self.active_match(guild_id, now)
+        if active is None:
             return None, []
-        predictions = await self.predictions.list_for_match(match.id)
-        return match, sort_predictions_for_listing(predictions)
+        predictions = await self.predictions.list_for_match(active.match.id)
+        return active, sort_predictions_for_listing(predictions)
 
     async def list_matches(self, guild_id: int) -> list[Match]:
         return await self.matches.list_all(guild_id)
