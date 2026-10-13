@@ -51,6 +51,7 @@ async def test_list_predictions_returns_sorted_types_for_current_match(
     match, predictions = await service.list_predictions(1, now + timedelta(minutes=3))
 
     assert match is not None
+    assert not match.in_progress
     assert [prediction.user_id for prediction in predictions] == [103, 102, 101]
 
 
@@ -92,42 +93,7 @@ async def test_list_predictions_returns_live_match_after_kickoff(
     match, predictions = await service.list_predictions(1, kickoff + timedelta(hours=1))
 
     assert match is not None
-    assert [prediction.user_id for prediction in predictions] == [101]
-
-
-@pytest.mark.asyncio
-async def test_list_predictions_prefers_live_match_over_open_window_match(
-    service: TyperService,
-) -> None:
-    live_kickoff = datetime(2030, 1, 1, tzinfo=timezone.utc) - timedelta(hours=1)
-    future_kickoff = datetime(2030, 1, 1, tzinfo=timezone.utc) + timedelta(days=2)
-    await service.add_match(
-        1,
-        "Manchester United",
-        "Liverpool",
-        "Premier League",
-        future_kickoff,
-    )
-    await service.save_prediction(1, 201, Score(1, 1), future_kickoff - timedelta(days=2))
-    # Reguła „jeden nierozliczony mecz” blokuje taki stan przez add_match;
-    # odtwarzamy dane zainstalowane przed tą regułą bezpośrednio w repozytorium.
-    await service.matches.add(
-        Match(
-            id=None,
-            guild_id=1,
-            home_team="Everton",
-            away_team="Manchester United",
-            competition="Premier League",
-            kickoff_at=live_kickoff,
-        )
-    )
-    await service.save_prediction(1, 101, Score(2, 0), live_kickoff - timedelta(hours=2))
-
-    now = datetime(2030, 1, 1, tzinfo=timezone.utc)
-    match, predictions = await service.list_predictions(1, now)
-
-    assert match is not None
-    assert match.kickoff_at == live_kickoff
+    assert match.in_progress
     assert [prediction.user_id for prediction in predictions] == [101]
 
 
@@ -170,7 +136,7 @@ def test_format_all_predictions_prefixes_live_match_header() -> None:
     message = format_all_predictions(
         _match_with_kickoff(kickoff),
         [_prediction(101)],
-        now=kickoff + timedelta(hours=1),
+        in_progress=True,
     )
 
     assert (
@@ -185,7 +151,7 @@ def test_format_all_predictions_prefixes_header_on_empty_listing() -> None:
     message = format_all_predictions(
         _match_with_kickoff(kickoff),
         [],
-        now=kickoff + timedelta(hours=1),
+        in_progress=True,
     )
 
     assert (
@@ -199,7 +165,7 @@ def test_format_all_predictions_has_no_header_for_open_window_match() -> None:
     message = format_all_predictions(
         _match_with_kickoff(kickoff),
         [_prediction(101)],
-        now=kickoff - timedelta(days=1),
+        in_progress=False,
     )
 
     assert (

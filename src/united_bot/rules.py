@@ -5,6 +5,18 @@ from datetime import datetime
 from .domain import DomainError, Match, MatchStatus
 
 
+def select_active_match(
+    in_progress: Match | None,
+    open_window: Match | None,
+) -> tuple[Match, bool] | None:
+    """Choose the active match: live unresolved first, then open window."""
+    if in_progress is not None:
+        return in_progress, True
+    if open_window is not None:
+        return open_window, False
+    return None
+
+
 def ensure_deletable(match: Match) -> None:
     if match.status is not MatchStatus.SCHEDULED:
         raise DomainError("Nie można usunąć rozliczonego meczu.")
