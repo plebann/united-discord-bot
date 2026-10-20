@@ -12,7 +12,7 @@ from united_bot.db import (
     create_schema,
     create_session_factory,
 )
-from united_bot.domain import Score
+from united_bot.domain import Prediction, Score
 
 DB_PATH = Path(__file__).resolve().parent.parent / "test_match_started_listings.db"
 
@@ -78,7 +78,7 @@ async def test_match_started_announcement_lists_types_with_resolved_names(starte
     await typer.save_prediction(1, 101, Score(0, 2), now)
     await typer.save_prediction(1, 102, Score(1, 1), now + timedelta(minutes=1))
     await typer.save_prediction(1, 103, Score(3, 0), now + timedelta(minutes=2))
-    resolver.names = {101: "Kowalski", 103: "Nowak"}
+    resolver.names = {101: "@everyone", 103: "Nowak"}
 
     match, _ = await typer.list_predictions(1, now + timedelta(minutes=3))
     assert match is not None
@@ -86,21 +86,22 @@ async def test_match_started_announcement_lists_types_with_resolved_names(starte
 
     assert len(publisher.messages) == 1
     listing_lines = [
-        "Typy na mecz Everton - Manchester United",
+        "Typy na mecz Everton - Manchester United (3)",
         "",
-        "\U0001f535 Wygrana gospodarzy",
-        "1. Nowak — 3:0",
+        "\U0001f534 Porażka (1)",
+        "Nowak — 3:0",
         "",
-        "\u26aa Remis",
-        "1. <@102> — 1:1",
+        "\u26aa Remis (1)",
+        "Użytkownik 102 — 1:1",
         "",
-        "\U0001f534 Wygrana gości",
-        "1. Kowalski — 0:2",
+        "\U0001f7e2 Wygrana (1)",
+        "@\u200beveryone — 0:2",
     ]
     assert "\n".join(listing_lines) in publisher.messages[0]
     assert "Mecz rozpoczęty: Everton - Manchester United" in publisher.messages[0]
     assert "<@101>" not in publisher.messages[0]
     assert "<@103>" not in publisher.messages[0]
+    assert "@everyone" not in publisher.messages[0]
 
 
 @pytest.mark.asyncio
@@ -114,6 +115,7 @@ async def test_match_started_announcement_reports_no_types_and_skips_name_lookup
     await service.publish_match_started(match.match, kickoff)
 
     assert len(publisher.messages) == 1
+    assert "Typy na mecz Everton - Manchester United (0)" in publisher.messages[0]
     assert "Nikt jeszcze nie typował na mecz Everton - Manchester United." in publisher.messages[0]
     assert resolver.calls == 0
 
@@ -137,7 +139,7 @@ async def test_match_started_announcement_is_published_once_per_match(started_en
 
 
 @pytest.mark.asyncio
-async def test_match_started_announcement_falls_back_to_mentions_without_resolver(
+async def test_match_started_announcement_falls_back_to_text_without_resolver(
     started_env,
 ):
     service, typer, publisher, _ = started_env
@@ -151,4 +153,42 @@ async def test_match_started_announcement_falls_back_to_mentions_without_resolve
     assert match is not None
     await service.publish_match_started(match.match, kickoff)
 
-    assert "1. <@101> — 2:0" in publisher.messages[0]
+    assert "Użytkownik 101 — 2:0" in publisher.messages[0]
+    assert "<@101>" not in publisher.messages[0]
+
+
+@pytest.mark.asyncio
+async def test_result_announcement_uses_text_names_and_all_type_counts(started_env):
+    service, typer, publisher, resolver = started_env
+    kickoff = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    await seed_started_match(typer, kickoff)
+    match, _ = await typer.list_predictions(1, kickoff - timedelta(days=1))
+    assert match is not None
+    resolver.names = {101: "@here"}
+    predictions = [
+        Prediction(
+            match_id=match.match.id or 0,
+            user_id=101,
+            score=Score(3, 2),
+            points=5,
+            submitted_at=kickoff - timedelta(days=1),
+        ),
+        Prediction(
+            match_id=match.match.id or 0,
+            user_id=102,
+            score=Score(1, 1),
+            points=3,
+            submitted_at=kickoff - timedelta(days=1),
+        ),
+    ]
+
+    await service.publish_result(match.match.finish(Score(2, 1)), predictions)
+
+    message = publisher.messages[0]
+    assert "Typy: 2" in message
+    assert "Porażka: 1 | Remis: 1 | Wygrana: 0" in message
+    assert "1. @\u200bhere — 3:2 — 5 pkt" in message
+    assert "@here" not in message
+    assert "Użytkownik 102 — 1:1 — 3 pkt" in message
+    assert "<@101>" not in message
+    assert "<@102>" not in message
