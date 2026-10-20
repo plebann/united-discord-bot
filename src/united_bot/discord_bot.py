@@ -11,7 +11,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from .announcements import AnnouncementService, DisplayNameResolver, prediction_listing_text
-from .application import TyperService
+from .application import TyperService, TyperStatistics
 from .domain import (
     DomainError,
     Match,
@@ -412,6 +412,32 @@ class UserTyperCog(commands.Cog):
         except (DomainError, LookupError, RuntimeError, discord.DiscordException) as exc:
             await _send_command_error(interaction, exc)
 
+    @app_commands.command(name="klasyfikacja")
+    @app_commands.check(configured_channel_check)
+    async def classification(self, interaction: discord.Interaction) -> None:
+        try:
+            await interaction.response.defer(ephemeral=True)
+            statistics = await self.service.classification(interaction.guild_id or 0)
+            names = {}
+            if self.display_names is not None:
+                names = await self.display_names.resolve(
+                    interaction.guild_id or 0,
+                    [row.user_id for row in statistics],
+                )
+            content = format_classification(
+                statistics,
+                lambda user_id: names.get(user_id) or f"Użytkownik {user_id}",
+            )
+            for chunk in _split_messages(content):
+                await interaction.followup.send(chunk, ephemeral=True)
+            logger.info(
+                "Wyświetlono klasyfikację %d typujących na guildzie %s",
+                len(statistics),
+                interaction.guild_id,
+            )
+        except (DomainError, LookupError, RuntimeError, discord.DiscordException) as exc:
+            await _send_command_error(interaction, exc)
+
 
 def build_prediction_listing(
     match: Match,
@@ -446,6 +472,38 @@ def format_match_listing(matches: list[Match]) -> str:
     lines = []
     for match in matches:
         lines.append(f"#{match.id} · {_describe_match(match)}")
+    return "\n".join(lines)
+
+
+def format_classification(
+    statistics: tuple[TyperStatistics, ...],
+    display_user: Callable[[int], str],
+) -> str:
+    if not statistics:
+        return "Nikt jeszcze nie typował."
+    ranked = sorted(
+        statistics,
+        key=lambda row: (
+            -row.points,
+            -row.exact_hits,
+            row.prediction_count,
+            display_user(row.user_id).casefold(),
+            row.user_id,
+        ),
+    )
+    lines = []
+    previous_result: tuple[int, int, int] | None = None
+    rank = 0
+    for index, row in enumerate(ranked, start=1):
+        result = (row.points, row.exact_hits, row.prediction_count)
+        if result != previous_result:
+            rank = index
+            previous_result = result
+        name = display_user(row.user_id).replace("@", "@\u200b")
+        lines.append(
+            f"{rank}. {name} — {row.points} pkt · "
+            f"{row.exact_hits} dokładne trafienia · {row.prediction_count} typy"
+        )
     return "\n".join(lines)
 
 
