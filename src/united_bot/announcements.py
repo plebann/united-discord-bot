@@ -50,6 +50,14 @@ def _listing_group_order(match: Match) -> tuple[ResultType, ...]:
     return (ResultType.HOME_WIN, ResultType.DRAW, ResultType.AWAY_WIN)
 
 
+def _without_discord_mentions(value: str) -> str:
+    return value.replace("@", "@\u200b")
+
+
+def _display_name(names: dict[int, str], user_id: int) -> str:
+    return _without_discord_mentions(names.get(user_id) or f"Użytkownik {user_id}")
+
+
 def prediction_listing_text(
     match: Match,
     predictions: list[Prediction],
@@ -75,7 +83,7 @@ def prediction_listing_text(
         lines.append("")
         lines.append(f"{_listing_group_heading(match, result_type_group)} ({len(group)})")
         lines.extend(
-            f"{display_user(prediction.user_id)} — "
+            f"{_without_discord_mentions(display_user(prediction.user_id))} — "
             f"{prediction.score.home}:{prediction.score.away}"
             for prediction in group
         )
@@ -271,7 +279,7 @@ class AnnouncementService:
             f"Pokazano top {len(top_predictions)} z {len(predictions)} typów",
         ]
         lines.extend(
-            f"{index}. {names.get(prediction.user_id) or f'Użytkownik {prediction.user_id}'} — "
+            f"{index}. {_display_name(names, prediction.user_id)} — "
             f"{prediction.score.home}:{prediction.score.away} — "
             f"{prediction.points} pkt"
             for index, prediction in enumerate(top_predictions, start=1)

@@ -78,7 +78,7 @@ async def test_match_started_announcement_lists_types_with_resolved_names(starte
     await typer.save_prediction(1, 101, Score(0, 2), now)
     await typer.save_prediction(1, 102, Score(1, 1), now + timedelta(minutes=1))
     await typer.save_prediction(1, 103, Score(3, 0), now + timedelta(minutes=2))
-    resolver.names = {101: "Kowalski", 103: "Nowak"}
+    resolver.names = {101: "@everyone", 103: "Nowak"}
 
     match, _ = await typer.list_predictions(1, now + timedelta(minutes=3))
     assert match is not None
@@ -95,12 +95,13 @@ async def test_match_started_announcement_lists_types_with_resolved_names(starte
         "Użytkownik 102 — 1:1",
         "",
         "\U0001f7e2 Wygrana (1)",
-        "Kowalski — 0:2",
+        "@\u200beveryone — 0:2",
     ]
     assert "\n".join(listing_lines) in publisher.messages[0]
     assert "Mecz rozpoczęty: Everton - Manchester United" in publisher.messages[0]
     assert "<@101>" not in publisher.messages[0]
     assert "<@103>" not in publisher.messages[0]
+    assert "@everyone" not in publisher.messages[0]
 
 
 @pytest.mark.asyncio
@@ -163,7 +164,7 @@ async def test_result_announcement_uses_text_names_and_all_type_counts(started_e
     await seed_started_match(typer, kickoff)
     match, _ = await typer.list_predictions(1, kickoff - timedelta(days=1))
     assert match is not None
-    resolver.names = {101: "Xilyn"}
+    resolver.names = {101: "@here"}
     predictions = [
         Prediction(
             match_id=match.match.id or 0,
@@ -186,7 +187,8 @@ async def test_result_announcement_uses_text_names_and_all_type_counts(started_e
     message = publisher.messages[0]
     assert "Typy: 2" in message
     assert "Porażka: 1 | Remis: 1 | Wygrana: 0" in message
-    assert "1. Xilyn — 3:2 — 5 pkt" in message
+    assert "1. @\u200bhere — 3:2 — 5 pkt" in message
+    assert "@here" not in message
     assert "Użytkownik 102 — 1:1 — 3 pkt" in message
     assert "<@101>" not in message
     assert "<@102>" not in message
