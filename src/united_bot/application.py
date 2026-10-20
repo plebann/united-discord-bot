@@ -9,6 +9,7 @@ from .domain import (
     Match,
     Prediction,
     Score,
+    TyperStatistics,
     sort_predictions_for_listing,
     utc_now,
 )
@@ -31,14 +32,6 @@ class ActiveMatch:
 class ActivePrediction:
     active_match: ActiveMatch | None
     prediction: Prediction | None
-
-
-@dataclass(frozen=True, slots=True)
-class TyperStatistics:
-    user_id: int
-    points: int
-    exact_hits: int
-    prediction_count: int
 
 
 class TyperService:
@@ -163,16 +156,7 @@ class TyperService:
         return await self.matches.list_all(guild_id)
 
     async def classification(self, guild_id: int) -> tuple[TyperStatistics, ...]:
-        statistics = await self.predictions.classification(guild_id)
-        return tuple(
-            TyperStatistics(
-                user_id=row.user_id,
-                points=row.points,
-                exact_hits=row.exact_hits,
-                prediction_count=row.prediction_count,
-            )
-            for row in statistics
-        )
+        return tuple(await self.predictions.classification(guild_id))
 
     async def delete_match(self, guild_id: int, match_id: int) -> Match:
         match = await self.matches.get(match_id, guild_id)

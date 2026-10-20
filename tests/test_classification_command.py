@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -71,6 +73,7 @@ async def add_match(
         "Manchester United",
         "Premier League",
         kickoff,
+        now=kickoff - timedelta(days=4),
     )
 
 

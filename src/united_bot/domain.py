@@ -133,6 +133,24 @@ class Prediction:
     updated_at: datetime | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class TyperStatistics:
+    user_id: int
+    points: int
+    exact_hits: int
+    prediction_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class RankedTyperStatistics:
+    rank: int
+    user_id: int
+    display_name: str
+    points: int
+    exact_hits: int
+    prediction_count: int
+
+
 _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 

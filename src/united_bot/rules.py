@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from datetime import datetime
 
-from .domain import DomainError, Match, MatchStatus
+from .domain import (
+    DomainError,
+    Match,
+    MatchStatus,
+    RankedTyperStatistics,
+    TyperStatistics,
+)
 
 
 def select_active_match(
@@ -44,3 +51,40 @@ def ensure_no_other_unresolved(existing: Match | None) -> None:
             f"Mecz {existing.home_team} - {existing.away_team} nie został jeszcze rozliczony. "
             f"Zamknij go przed dodaniem kolejnego spotkania."
         )
+
+
+def rank_typer_statistics(
+    statistics: Iterable[TyperStatistics],
+    display_user: Callable[[int], str],
+) -> tuple[RankedTyperStatistics, ...]:
+    named_statistics = [(row, display_user(row.user_id)) for row in statistics]
+    ordered = sorted(
+        named_statistics,
+        key=lambda item: (
+            -item[0].points,
+            -item[0].exact_hits,
+            item[0].prediction_count,
+            item[1].casefold(),
+            item[0].user_id,
+        ),
+    )
+
+    ranked = []
+    previous_result: tuple[int, int, int] | None = None
+    rank = 0
+    for index, (row, display_name) in enumerate(ordered, start=1):
+        result = (row.points, row.exact_hits, row.prediction_count)
+        if result != previous_result:
+            rank = index
+            previous_result = result
+        ranked.append(
+            RankedTyperStatistics(
+                rank=rank,
+                user_id=row.user_id,
+                display_name=display_name,
+                points=row.points,
+                exact_hits=row.exact_hits,
+                prediction_count=row.prediction_count,
+            )
+        )
+    return tuple(ranked)

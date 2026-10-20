@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, case, delete, event, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from .domain import Match, MatchStatus, Prediction, Score
+from .domain import Match, MatchStatus, Prediction, Score, TyperStatistics
 
 
 class Base(DeclarativeBase):
@@ -46,14 +45,6 @@ class AnnouncementRow(Base):
     match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), primary_key=True)
     announcement_type: Mapped[str] = mapped_column(String(40), primary_key=True)
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-
-
-@dataclass(frozen=True, slots=True)
-class PredictionStatistics:
-    user_id: int
-    points: int
-    exact_hits: int
-    prediction_count: int
 
 
 def match_row_to_domain(row: MatchRow) -> Match:
@@ -325,7 +316,7 @@ class PredictionRepository:
             )
             return row is not None
 
-    async def classification(self, guild_id: int) -> list[PredictionStatistics]:
+    async def classification(self, guild_id: int) -> list[TyperStatistics]:
         async with self._session_factory() as session:
             exact_hit = case(
                 (
@@ -352,7 +343,7 @@ class PredictionRepository:
                 )
             ).all()
             return [
-                PredictionStatistics(
+                TyperStatistics(
                     user_id=user_id,
                     points=points,
                     exact_hits=exact_hits,

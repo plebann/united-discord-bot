@@ -11,13 +11,15 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from .announcements import AnnouncementService, DisplayNameResolver, prediction_listing_text
-from .application import TyperService, TyperStatistics
+from .application import TyperService
 from .domain import (
     DomainError,
     Match,
     Prediction,
+    RankedTyperStatistics,
     Score,
 )
+from .rules import rank_typer_statistics
 
 logger = logging.getLogger(__name__)
 LOCAL_TIMEZONE = ZoneInfo("Europe/Warsaw")
@@ -424,10 +426,11 @@ class UserTyperCog(commands.Cog):
                     interaction.guild_id or 0,
                     [row.user_id for row in statistics],
                 )
-            content = format_classification(
+            ranked = rank_typer_statistics(
                 statistics,
                 lambda user_id: names.get(user_id) or f"Użytkownik {user_id}",
             )
+            content = format_classification(ranked)
             for chunk in _split_messages(content):
                 await interaction.followup.send(chunk, ephemeral=True)
             logger.info(
@@ -476,32 +479,15 @@ def format_match_listing(matches: list[Match]) -> str:
 
 
 def format_classification(
-    statistics: tuple[TyperStatistics, ...],
-    display_user: Callable[[int], str],
+    ranked: tuple[RankedTyperStatistics, ...],
 ) -> str:
-    if not statistics:
+    if not ranked:
         return "Nikt jeszcze nie typował."
-    ranked = sorted(
-        statistics,
-        key=lambda row: (
-            -row.points,
-            -row.exact_hits,
-            row.prediction_count,
-            display_user(row.user_id).casefold(),
-            row.user_id,
-        ),
-    )
     lines = []
-    previous_result: tuple[int, int, int] | None = None
-    rank = 0
-    for index, row in enumerate(ranked, start=1):
-        result = (row.points, row.exact_hits, row.prediction_count)
-        if result != previous_result:
-            rank = index
-            previous_result = result
-        name = display_user(row.user_id).replace("@", "@\u200b")
+    for row in ranked:
+        name = row.display_name.replace("@", "@\u200b")
         lines.append(
-            f"{rank}. {name} — {row.points} pkt · "
+            f"{row.rank}. {name} — {row.points} pkt · "
             f"{row.exact_hits} dokładne trafienia · {row.prediction_count} typy"
         )
     return "\n".join(lines)
