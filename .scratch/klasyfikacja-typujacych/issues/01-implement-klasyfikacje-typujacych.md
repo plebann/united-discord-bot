@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 
 # Implementacja Klasyfikacji typujących
 
@@ -25,5 +25,12 @@ Klasyfikacji typujących zgodne ze specyfikacją.
 ## Zależności
 
 Brak.
+
+## Answer
+
+Zaimplementowano i scalono do gałęzi integracyjnej `feature/klasyfikacja-typujacych`
+w commicie `9bff4b6899b2007fb3c8bc6ce8e0943147c12798`. Weryfikacja gałęzi:
+89 testów, `ruff check .` i kontrola formatu zmienionych plików zakończone
+powodzeniem.
 
 ## Comments
