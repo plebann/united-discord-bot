@@ -16,8 +16,10 @@ from .domain import (
     DomainError,
     Match,
     Prediction,
+    RankedTyperStatistics,
     Score,
 )
+from .rules import rank_typer_statistics
 
 logger = logging.getLogger(__name__)
 LOCAL_TIMEZONE = ZoneInfo("Europe/Warsaw")
@@ -412,6 +414,33 @@ class UserTyperCog(commands.Cog):
         except (DomainError, LookupError, RuntimeError, discord.DiscordException) as exc:
             await _send_command_error(interaction, exc)
 
+    @app_commands.command(name="klasyfikacja")
+    @app_commands.check(configured_channel_check)
+    async def classification(self, interaction: discord.Interaction) -> None:
+        try:
+            await interaction.response.defer(ephemeral=True)
+            statistics = await self.service.classification(interaction.guild_id or 0)
+            names = {}
+            if self.display_names is not None:
+                names = await self.display_names.resolve(
+                    interaction.guild_id or 0,
+                    [row.user_id for row in statistics],
+                )
+            ranked = rank_typer_statistics(
+                statistics,
+                lambda user_id: names.get(user_id) or f"Użytkownik {user_id}",
+            )
+            content = format_classification(ranked)
+            for chunk in _split_messages(content):
+                await interaction.followup.send(chunk, ephemeral=True)
+            logger.info(
+                "Wyświetlono klasyfikację %d typujących na guildzie %s",
+                len(statistics),
+                interaction.guild_id,
+            )
+        except (DomainError, LookupError, RuntimeError, discord.DiscordException) as exc:
+            await _send_command_error(interaction, exc)
+
 
 def build_prediction_listing(
     match: Match,
@@ -446,6 +475,21 @@ def format_match_listing(matches: list[Match]) -> str:
     lines = []
     for match in matches:
         lines.append(f"#{match.id} · {_describe_match(match)}")
+    return "\n".join(lines)
+
+
+def format_classification(
+    ranked: tuple[RankedTyperStatistics, ...],
+) -> str:
+    if not ranked:
+        return "Nikt jeszcze nie typował."
+    lines = []
+    for row in ranked:
+        name = row.display_name.replace("@", "@\u200b")
+        lines.append(
+            f"{row.rank}\\. {name} — {row.points} pkt · "
+            f"{row.exact_hits} dokładne trafienia · {row.prediction_count} typy"
+        )
     return "\n".join(lines)
 
 

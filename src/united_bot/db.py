@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, delete, event, select
+from sqlalchemy import DateTime, ForeignKey, Integer, String, case, delete, event, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from .domain import Match, MatchStatus, Prediction, Score
+from .domain import Match, MatchStatus, Prediction, Score, TyperStatistics
 
 
 class Base(DeclarativeBase):
@@ -315,6 +315,42 @@ class PredictionRepository:
                 .limit(1)
             )
             return row is not None
+
+    async def classification(self, guild_id: int) -> list[TyperStatistics]:
+        async with self._session_factory() as session:
+            exact_hit = case(
+                (
+                    (
+                        (MatchRow.status == MatchStatus.FINISHED.value)
+                        & (PredictionRow.home_score == MatchRow.final_home_score)
+                        & (PredictionRow.away_score == MatchRow.final_away_score)
+                    ),
+                    1,
+                ),
+                else_=0,
+            )
+            rows = (
+                await session.execute(
+                    select(
+                        PredictionRow.user_id,
+                        func.coalesce(func.sum(PredictionRow.points), 0),
+                        func.sum(exact_hit),
+                        func.count(),
+                    )
+                    .join(MatchRow, MatchRow.id == PredictionRow.match_id)
+                    .where(MatchRow.guild_id == guild_id)
+                    .group_by(PredictionRow.user_id)
+                )
+            ).all()
+            return [
+                TyperStatistics(
+                    user_id=user_id,
+                    points=points,
+                    exact_hits=exact_hits,
+                    prediction_count=prediction_count,
+                )
+                for user_id, points, exact_hits, prediction_count in rows
+            ]
 
     async def settle_match(self, match_id: int, actual: Score) -> list[Prediction]:
         async with self._session_factory() as session:

@@ -9,6 +9,7 @@ from .domain import (
     Match,
     Prediction,
     Score,
+    TyperStatistics,
     sort_predictions_for_listing,
     utc_now,
 )
@@ -153,6 +154,9 @@ class TyperService:
 
     async def list_matches(self, guild_id: int) -> list[Match]:
         return await self.matches.list_all(guild_id)
+
+    async def classification(self, guild_id: int) -> tuple[TyperStatistics, ...]:
+        return tuple(await self.predictions.classification(guild_id))
 
     async def delete_match(self, guild_id: int, match_id: int) -> Match:
         match = await self.matches.get(match_id, guild_id)

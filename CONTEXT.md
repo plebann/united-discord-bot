@@ -30,3 +30,18 @@ pierwszeństwo nad przyszłym z otwartym oknem; inaczej mecz z otwartym oknem
 typowania; gdy żaden warunek nie zachodzi — taki mecz nie istnieje.
 Nie jest synonimem pojęcia „Nierozliczony mecz".
 _Avoid_: docelowy mecz, bieżący mecz, otwarty mecz
+
+**Typujący**:
+Użytkownik, który ma co najmniej jeden zachowany typ w historii danej gildii,
+niezależnie od tego, czy typ został już rozliczony.
+_Avoid_: gracz, uczestnik rankingu
+
+**Klasyfikacja typujących**:
+Historyczne zestawienie typujących w jednej gildii, uporządkowane według ich
+wyników w typerze.
+_Avoid_: ranking, tabela
+
+**Dokładne trafienie**:
+Typ rozliczonego meczu, którego wynik typowany jest identyczny z wynikiem
+regulaminowym.
+_Avoid_: pełne trafienie, idealny typ
