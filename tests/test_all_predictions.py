@@ -141,8 +141,34 @@ def test_format_all_predictions_prefixes_live_match_header() -> None:
 
     assert (
         message == "\u26bd Mecz Everton - Manchester United trwa — typowanie zamknięte.\n"
-        "Typy na mecz Everton - Manchester United\n\n\U0001f535 Wygrana gospodarzy\n"
-        "1. <@101> — 3:0"
+        "Typy na mecz Everton - Manchester United (1)\n\n"
+        "\U0001f534 Porażka (1)\nUżytkownik 101 — 3:0"
+    )
+
+
+def test_format_all_predictions_uses_united_perspective_for_home_match() -> None:
+    kickoff = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    match = Match(
+        id=7,
+        guild_id=1,
+        home_team=" Manchester United ",
+        away_team="Leeds",
+        competition="Premier League",
+        kickoff_at=kickoff,
+    )
+    predictions = [
+        Prediction(match_id=7, user_id=101, score=Score(3, 0)),
+        Prediction(match_id=7, user_id=102, score=Score(1, 1)),
+        Prediction(match_id=7, user_id=103, score=Score(0, 2)),
+    ]
+
+    message = format_all_predictions(match, predictions, in_progress=False)
+
+    assert message == (
+        "Typy na mecz  Manchester United  - Leeds (3)\n\n"
+        "\U0001f7e2 Wygrana (1)\nUżytkownik 101 — 3:0\n\n"
+        "\u26aa Remis (1)\nUżytkownik 102 — 1:1\n\n"
+        "\U0001f534 Porażka (1)\nUżytkownik 103 — 0:2"
     )
 
 
@@ -156,6 +182,7 @@ def test_format_all_predictions_prefixes_header_on_empty_listing() -> None:
 
     assert (
         message == "\u26bd Mecz Everton - Manchester United trwa — typowanie zamknięte.\n"
+        "Typy na mecz Everton - Manchester United (0)\n"
         "Nikt jeszcze nie typował na mecz Everton - Manchester United."
     )
 
@@ -169,6 +196,6 @@ def test_format_all_predictions_has_no_header_for_open_window_match() -> None:
     )
 
     assert (
-        message == "Typy na mecz Everton - Manchester United\n\n\U0001f535 Wygrana gospodarzy\n"
-        "1. <@101> — 3:0"
+        message == "Typy na mecz Everton - Manchester United (1)\n\n"
+        "\U0001f534 Porażka (1)\nUżytkownik 101 — 3:0"
     )

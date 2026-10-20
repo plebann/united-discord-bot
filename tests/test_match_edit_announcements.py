@@ -73,5 +73,6 @@ async def test_match_started_announcement_closes_prediction_window() -> None:
         "Rozgrywki: Premier League\n"
         "Kick-off: <t:1893456000:f>\n"
         "Typowanie zamknięte.\n\n"
+        "Typy na mecz Everton - Manchester United (0)\n"
         "Nikt jeszcze nie typował na mecz Everton - Manchester United."
     ]

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -9,7 +10,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from .announcements import AnnouncementService, prediction_listing_text
+from .announcements import AnnouncementService, DisplayNameResolver, prediction_listing_text
 from .application import TyperService
 from .domain import (
     DomainError,
@@ -283,8 +284,13 @@ def _admin_denial_message() -> str:
 
 
 class UserTyperCog(commands.Cog):
-    def __init__(self, service: TyperService) -> None:
+    def __init__(
+        self,
+        service: TyperService,
+        display_names: DisplayNameResolver | None = None,
+    ) -> None:
         self.service = service
+        self.display_names = display_names
 
     @app_commands.command(name="typ")
     @app_commands.check(configured_channel_check)
@@ -382,8 +388,18 @@ class UserTyperCog(commands.Cog):
                     ephemeral=True,
                 )
                 return
+            names = {}
+            if self.display_names is not None:
+                names = await self.display_names.resolve(
+                    active.match.guild_id, [prediction.user_id for prediction in predictions]
+                )
             chunks = _split_messages(
-                format_all_predictions(active.match, predictions, active.in_progress)
+                format_all_predictions(
+                    active.match,
+                    predictions,
+                    active.in_progress,
+                    lambda user_id: names.get(user_id) or f"Użytkownik {user_id}",
+                )
             )
             for chunk in chunks:
                 await interaction.followup.send(chunk, ephemeral=True)
@@ -397,11 +413,15 @@ class UserTyperCog(commands.Cog):
             await _send_command_error(interaction, exc)
 
 
-def build_prediction_listing(match: Match, predictions: list[Prediction]) -> str:
+def build_prediction_listing(
+    match: Match,
+    predictions: list[Prediction],
+    display_user: Callable[[int], str] | None = None,
+) -> str:
     return prediction_listing_text(
         match,
         predictions,
-        lambda user_id: f"<@{user_id}>",
+        display_user or (lambda user_id: f"Użytkownik {user_id}"),
     )
 
 
@@ -409,12 +429,9 @@ def format_all_predictions(
     match: Match,
     predictions: list[Prediction],
     in_progress: bool,
+    display_user: Callable[[int], str] | None = None,
 ) -> str:
-    message = (
-        build_prediction_listing(match, predictions)
-        if predictions
-        else f"Nikt jeszcze nie typował na mecz {match.home_team} - {match.away_team}."
-    )
+    message = build_prediction_listing(match, predictions, display_user)
     if in_progress:
         message = (
             f"\u26bd Mecz {match.home_team} - {match.away_team} trwa — "
@@ -458,7 +475,7 @@ async def create_bot(
     intents = discord.Intents(guilds=True)
     bot = commands.Bot(command_prefix="!", intents=intents)
     await bot.add_cog(TyperCog(service, announcements))
-    await bot.add_cog(UserTyperCog(service))
+    await bot.add_cog(UserTyperCog(service, name_resolver))
 
     async def sync_commands() -> None:
         await bot.tree.sync()

@@ -27,11 +27,27 @@ class DisplayNameResolver(Protocol):
     async def resolve(self, guild_id: int, user_ids: list[int]) -> dict[int, str]: ...
 
 
-LISTING_GROUP_HEADINGS = {
-    ResultType.HOME_WIN: "\U0001f535 Wygrana gospodarzy",
-    ResultType.DRAW: "\u26aa Remis",
-    ResultType.AWAY_WIN: "\U0001f534 Wygrana gości",
-}
+MANCHESTER_UNITED = "manchester united"
+
+
+def _is_united_home(match: Match) -> bool:
+    return match.home_team.strip().casefold() == MANCHESTER_UNITED
+
+
+def _listing_group_heading(match: Match, result: ResultType) -> str:
+    if result == ResultType.DRAW:
+        return "\u26aa Remis"
+    united_won = (
+        result == ResultType.HOME_WIN
+        if _is_united_home(match)
+        else result == ResultType.AWAY_WIN
+    )
+    return "\U0001f7e2 Wygrana" if united_won else "\U0001f534 Porażka"
+
+
+def _listing_group_order(match: Match) -> tuple[ResultType, ...]:
+    del match
+    return (ResultType.HOME_WIN, ResultType.DRAW, ResultType.AWAY_WIN)
 
 
 def prediction_listing_text(
@@ -39,9 +55,6 @@ def prediction_listing_text(
     predictions: list[Prediction],
     display_user: Callable[[int], str],
 ) -> str:
-    if not predictions:
-        return f"Nikt jeszcze nie typował na mecz {match.home_team} - {match.away_team}."
-    lines = [f"Typy na mecz {match.home_team} - {match.away_team}"]
     groups: dict[ResultType, list[Prediction]] = {
         ResultType.HOME_WIN: [],
         ResultType.DRAW: [],
@@ -49,20 +62,22 @@ def prediction_listing_text(
     }
     for prediction in predictions:
         groups[result_type(prediction.score)].append(prediction)
-    for result_type_group in (
-        ResultType.HOME_WIN,
-        ResultType.DRAW,
-        ResultType.AWAY_WIN,
-    ):
+
+    lines = [f"Typy na mecz {match.home_team} - {match.away_team} ({len(predictions)})"]
+    if not predictions:
+        lines.append(f"Nikt jeszcze nie typował na mecz {match.home_team} - {match.away_team}.")
+        return "\n".join(lines)
+
+    for result_type_group in _listing_group_order(match):
         group = groups[result_type_group]
         if not group:
             continue
         lines.append("")
-        lines.append(LISTING_GROUP_HEADINGS[result_type_group])
+        lines.append(f"{_listing_group_heading(match, result_type_group)} ({len(group)})")
         lines.extend(
-            f"{index}. {display_user(prediction.user_id)} — "
+            f"{display_user(prediction.user_id)} — "
             f"{prediction.score.home}:{prediction.score.away}"
-            for index, prediction in enumerate(group, start=1)
+            for prediction in group
         )
     return "\n".join(lines)
 
@@ -148,7 +163,7 @@ class AnnouncementService:
         listing = prediction_listing_text(
             match,
             predictions,
-            lambda user_id: names.get(user_id) or f"<@{user_id}>",
+            lambda user_id: names.get(user_id) or f"Użytkownik {user_id}",
         )
         content = (
             f"Mecz rozpoczęty: {match.home_team} - {match.away_team}\n"
@@ -237,13 +252,26 @@ class AnnouncementService:
                 prediction.submitted_at,
             ),
         )[:10]
+        names = await self._resolve_names(
+            match.guild_id, [prediction.user_id for prediction in top_predictions]
+        )
+        groups = {result: 0 for result in ResultType}
+        for prediction in predictions:
+            groups[result_type(prediction.score)] += 1
+        ordered_groups = _listing_group_order(match)
+        group_labels = {
+            result: _listing_group_heading(match, result).split(" ", 1)[1]
+            for result in ordered_groups
+        }
         lines = [
             f"Typowanie meczu {match.home_team} - {match.away_team} zostało zakończone.",
             f"Wynik: {match.final_score.home}:{match.final_score.away}",
+            f"Typy: {len(predictions)}",
+            " | ".join(f"{group_labels[result]}: {groups[result]}" for result in ordered_groups),
             f"Pokazano top {len(top_predictions)} z {len(predictions)} typów",
         ]
         lines.extend(
-            f"{index}. <@{prediction.user_id}> — "
+            f"{index}. {names.get(prediction.user_id) or f'Użytkownik {prediction.user_id}'} — "
             f"{prediction.score.home}:{prediction.score.away} — "
             f"{prediction.points} pkt"
             for index, prediction in enumerate(top_predictions, start=1)
