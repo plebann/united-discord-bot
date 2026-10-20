@@ -154,3 +154,20 @@ Documented here so agents don't "fix" them silently:
 - The architecture doc lists APScheduler and httpx; the current MVP uses
   `tasks.loop` and no HTTP client yet. Adopt the doc's choices only when that
   feature actually lands.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs are local Markdown files under `.scratch/`. See
+`docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The default five canonical triage roles are used as local issue statuses. See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repo; domain vocabulary lives in `CONTEXT.md`. See
+`docs/agents/domain.md`.

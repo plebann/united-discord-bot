@@ -2,12 +2,13 @@
 
 ## Status
 
-- Wersja: 1.6
-- Zakres: punktacja typowania, walidacja terminu meczu, ograniczenie liczby nierozliczonych meczów, usuwanie meczów, definicja czasu gry zawodników oraz prezentacja listy meczów
+- Wersja: 1.7
+- Zakres: punktacja typowania, walidacja terminu meczu, ograniczenie liczby nierozliczonych meczów, usuwanie meczów, definicja czasu gry zawodników oraz prezentacja list meczów i klasyfikacji
 - Cel: jednoznaczna podstawa do implementacji i testów domenowych
 
 ### Changelog
 
+- **1.7** — dodano zasady klasyfikacji typujących.
 - **1.6** — `/moj-typ` działa wyłącznie dla Aktywnego meczu do typowania i nie
   pokazuje historii ostatnich rozliczonych meczów.
 - **1.5** — terminologia: sekcja „Prezentacja listy typów" mapuje pojęcie
@@ -495,6 +496,66 @@ prezentowany jest typujący:
 
 Przy zerze typów miejsce listy zajmuje linia:
 `Nikt jeszcze nie typował na mecz {gospodarze} - {goście}.`
+
+## Prezentacja klasyfikacji typujących
+
+Komenda `/klasyfikacja` zwraca prywatnie pełną klasyfikację typujących
+**bieżącej gildii**. Nie ma sezonów, filtrów ani limitu liczby pozycji.
+Odpowiedź jest dostępna dla każdego użytkownika na skonfigurowanym kanale;
+nie wymaga uprawnień administratora.
+
+### Uczestnictwo i statystyki
+
+Do klasyfikacji należy każdy **Typujący**, czyli użytkownik z co najmniej jednym
+zachowanym typem w historii gildii — także wtedy, gdy jego jedyny typ dotyczy
+meczu nierozliczonego.
+
+Statystyki oznaczają:
+
+- **punkty** — sumę punktów przyznanych za rozliczone typy;
+- **dokładne trafienia** — liczbę rozliczonych typów zgodnych z wynikiem
+  regulaminowym;
+- **liczbę typów** — liczbę wszystkich zachowanych typów, również
+  nierozliczonych.
+
+Usunięty mecz i jego typy nie należą do historii ani klasyfikacji.
+
+### Kolejność i pozycje
+
+Typujący są sortowani:
+
+1. malejąco po punktach;
+2. malejąco po liczbie dokładnych trafień;
+3. rosnąco po liczbie typów;
+4. rosnąco alfabetycznie po wyświetlanej nazwie, bez rozróżniania wielkości
+   liter;
+5. rosnąco po identyfikatorze użytkownika, gdy nazwy są identyczne.
+
+Pierwsze trzy kryteria definiują pozycję. Typujący z równymi wartościami tych
+trzech statystyk współdzielą pozycję, stosując numerację zawodniczą:
+`1., 1., 3.`. Dwa ostatnie kryteria określają wyłącznie stabilną kolejność
+prezentacji pełnego remisu.
+
+### Format odpowiedzi
+
+Każdy wiersz ma format:
+
+```text
+1. Nazwa — 12 pkt · 2 dokładne trafienia · 5 typów
+```
+
+Nazwa jest ustalana tak samo jak na `/wszystkie-typy`. Gdy nie można jej
+ustalić, typujący pozostaje widoczny jako `Użytkownik <id>`; dotyczy to
+również osób, które opuściły gildię.
+
+Gdy w gildii nie ma żadnego zachowanego typu, odpowiedź brzmi:
+
+```text
+Nikt jeszcze nie typował.
+```
+
+Pełna klasyfikacja jest dzielona między kolejne prywatne wiadomości wyłącznie
+na granicach wierszy, gdy przekroczyłaby limit długości wiadomości Discorda.
 
 ## Prezentacja listy meczów
 
