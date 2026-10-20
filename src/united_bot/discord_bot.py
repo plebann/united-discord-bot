@@ -487,7 +487,7 @@ def format_classification(
     for row in ranked:
         name = row.display_name.replace("@", "@\u200b")
         lines.append(
-            f"{row.rank}. {name} — {row.points} pkt · "
+            f"{row.rank}\\. {name} — {row.points} pkt · "
             f"{row.exact_hits} dokładne trafienia · {row.prediction_count} typy"
         )
     return "\n".join(lines)

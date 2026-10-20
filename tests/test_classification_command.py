@@ -128,11 +128,11 @@ async def test_classification_command_shows_ranked_guild_history_privately(
     assert interaction.response.deferred == [True]
     assert interaction.followup.messages == [
         (
-            "1. Adam — 5 pkt · 1 dokładne trafienia · 1 typy\n"
-            "1. adam — 5 pkt · 1 dokładne trafienia · 1 typy\n"
-            "3. Beata — 5 pkt · 0 dokładne trafienia · 2 typy\n"
-            "4. Celina — 3 pkt · 0 dokładne trafienia · 1 typy\n"
-            "5. Użytkownik 105 — 3 pkt · 0 dokładne trafienia · 2 typy",
+            "1\\. Adam — 5 pkt · 1 dokładne trafienia · 1 typy\n"
+            "1\\. adam — 5 pkt · 1 dokładne trafienia · 1 typy\n"
+            "3\\. Beata — 5 pkt · 0 dokładne trafienia · 2 typy\n"
+            "4\\. Celina — 3 pkt · 0 dokładne trafienia · 1 typy\n"
+            "5\\. Użytkownik 105 — 3 pkt · 0 dokładne trafienia · 2 typy",
             True,
         )
     ]
@@ -166,5 +166,5 @@ async def test_classification_command_sends_every_row_when_response_is_long(
     assert all(ephemeral for _, ephemeral in interaction.followup.messages)
     rows = "\n".join(content for content, _ in interaction.followup.messages).splitlines()
     assert len(rows) == 80
-    assert rows[0].startswith("1. Użytkownik 1000 — 0 pkt")
-    assert rows[-1].startswith("1. Użytkownik 1079 — 0 pkt")
+    assert rows[0].startswith("1\\. Użytkownik 1000 — 0 pkt")
+    assert rows[-1].startswith("1\\. Użytkownik 1079 — 0 pkt")
