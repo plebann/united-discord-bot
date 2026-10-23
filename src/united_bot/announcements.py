@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime
 from typing import Protocol
+from zoneinfo import ZoneInfo
 
 from .db import AnnouncementRepository, MatchRepository, PredictionRepository
 from .domain import (
@@ -28,6 +29,30 @@ class DisplayNameResolver(Protocol):
 
 
 MANCHESTER_UNITED = "manchester united"
+LOCAL_TIMEZONE = ZoneInfo("Europe/Warsaw")
+POLISH_WEEKDAYS = (
+    "Poniedziałek",
+    "Wtorek",
+    "Środa",
+    "Czwartek",
+    "Piątek",
+    "Sobota",
+    "Niedziela",
+)
+POLISH_MONTHS = (
+    "Stycznia",
+    "Lutego",
+    "Marca",
+    "Kwietnia",
+    "Maja",
+    "Czerwca",
+    "Lipca",
+    "Sierpnia",
+    "Września",
+    "Października",
+    "Listopada",
+    "Grudnia",
+)
 
 
 def _is_united_home(match: Match) -> bool:
@@ -38,9 +63,7 @@ def _listing_group_heading(match: Match, result: ResultType) -> str:
     if result == ResultType.DRAW:
         return "\u26aa Remis"
     united_won = (
-        result == ResultType.HOME_WIN
-        if _is_united_home(match)
-        else result == ResultType.AWAY_WIN
+        result == ResultType.HOME_WIN if _is_united_home(match) else result == ResultType.AWAY_WIN
     )
     return "\U0001f7e2 Wygrana" if united_won else "\U0001f534 Porażka"
 
@@ -56,6 +79,13 @@ def _without_discord_mentions(value: str) -> str:
 
 def _display_name(names: dict[int, str], user_id: int) -> str:
     return _without_discord_mentions(names.get(user_id) or f"Użytkownik {user_id}")
+
+
+def _format_kickoff(kickoff_at: datetime) -> str:
+    local_kickoff = kickoff_at.astimezone(LOCAL_TIMEZONE)
+    weekday = POLISH_WEEKDAYS[local_kickoff.weekday()]
+    month = POLISH_MONTHS[local_kickoff.month - 1]
+    return f"{weekday}, {local_kickoff.day} {month} {local_kickoff.year}, {local_kickoff:%H:%M}"
 
 
 def prediction_listing_text(
@@ -117,7 +147,7 @@ class AnnouncementService:
                 f"# ⚽ NADCHODZĄCY MECZ\n"
                 f"## {match.home_team} vs {match.away_team}\n\n"
                 f"🏆 **Rozgrywki:** {match.competition}\n"
-                f"🕐 **Kick-off:** <t:{int(match.kickoff_at.timestamp())}:f>\n"
+                f"🕐 **Kick-off:** {_format_kickoff(match.kickoff_at)}\n"
                 f"🟢 **Typowanie aktywne!**\n\n"
                 "Wpisz `/typ 3:1`, aby zapisać swój typ.\n"
                 "-# Typowanie zamknie się wraz z pierwszym gwizdkiem."
@@ -127,7 +157,7 @@ class AnnouncementService:
                 f"# ⚽ NADCHODZĄCY MECZ\n"
                 f"## {match.home_team} vs {match.away_team}\n\n"
                 f"🏆 **Rozgrywki:** {match.competition}\n"
-                f"🕐 **Kick-off:** <t:{int(match.kickoff_at.timestamp())}:f>\n"
+                f"🕐 **Kick-off:** {_format_kickoff(match.kickoff_at)}\n"
                 f"🟢 **Typowanie rozpocznie się 3 dni przed pierwszym gwizdkiem!**\n\n"
                 "Wpisz `/typ 3:1`, aby zapisać swój typ.\n"
                 "-# Typowanie zamknie się wraz z pierwszym gwizdkiem."

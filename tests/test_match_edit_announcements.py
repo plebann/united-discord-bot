@@ -28,6 +28,18 @@ class Predictions:
 
 
 @pytest.mark.asyncio
+async def test_match_configured_announcement_formats_kickoff_in_polish() -> None:
+    kickoff = datetime(2026, 10, 24, 13, tzinfo=timezone.utc)
+    match = Match(1, 1, "Manchester United", "Bournemouth", "Premier League", kickoff)
+    publisher = Publisher()
+    service = AnnouncementService(None, None, Announcements(), publisher)  # type: ignore[arg-type]
+
+    await service.publish_match_configured(match, kickoff - timedelta(days=1))
+
+    assert "🕐 **Kick-off:** Sobota, 24 Października 2026, 15:00" in publisher.messages[0]
+
+
+@pytest.mark.asyncio
 async def test_edit_announcement_marks_typing_active_within_three_days() -> None:
     now = datetime(2030, 1, 1, tzinfo=timezone.utc)
     previous = Match(
